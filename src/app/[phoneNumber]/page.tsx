@@ -13,8 +13,8 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import { signOut, useSession } from "next-auth/react";
-import { LogIn, LogOut, User } from "lucide-react";
-// Removed: import CurrencyInput from 'react-currency-input-field';
+import { LogIn, LogOut, User, CreditCard, QrCode } from "lucide-react";
+import PixPayment from "@/components/PixPayment";
 
 // Initialize Stripe
 const stripePromise = loadStripe(
@@ -119,6 +119,7 @@ export default function DriverPaymentPage({
   const [clientSecret, setClientSecret] = useState("");
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'pix' | null>(null); // New: payment method selection
   const debounceRef = useRef<NodeJS.Timeout>();
 
   // --- Formatting Helper ---
@@ -197,6 +198,18 @@ export default function DriverPaymentPage({
   const handleSuccess = (pi: any) => {
     setPaymentSuccess(true);
     setPaymentDetails(pi);
+
+    // Redirect to success page with payment details for post-payment signup
+    const vendorName = profile?.nome || 'Vendedor'
+    const amountInCents = parseInt(rawAmountDigits || "0", 10)
+
+    const params = new URLSearchParams({
+      payment_intent: pi.id,
+      amount: amountInCents.toString(),
+      vendor: encodeURIComponent(vendorName)
+    })
+
+    window.location.href = `/pagamento/sucesso?${params.toString()}`
   };
 
   if (loadingInfo) {
@@ -370,38 +383,100 @@ export default function DriverPaymentPage({
             )}
           </div>
 
-          {/* amount input */}
+          {/* amount input and payment flow */}
           {!paymentSuccess ? (
             <>
-              <h2 className="text-center text-3xl font-semibold">
-                Qual valor pago?
-              </h2>
-              {/* Custom BRL Input */}
-              <div className="relative w-full">
-                <input
-                  type="text" // Use text to allow custom formatting display
-                  inputMode="numeric" // Hint for mobile numeric keyboard
-                  placeholder="R$ 0,00"
-                  value={formatBRL(rawAmountDigits)} // Display formatted value
-                  onChange={handleAmountInputChange} // Handle raw digit input
-                  className="w-full text-center text-3xl py-3 border rounded focus:ring-purple-500"
-                />
-              </div>
+              {/* Step 1: Amount Input */}
+              {!paymentMethod && (
+                <>
+                  <h2 className="text-center text-3xl font-semibold">
+                    Qual valor pago?
+                  </h2>
+                  {/* Custom BRL Input */}
+                  <div className="relative w-full">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="R$ 0,00"
+                      value={formatBRL(rawAmountDigits)}
+                      onChange={handleAmountInputChange}
+                      className="w-full text-center text-3xl py-3 border rounded focus:ring-purple-500"
+                    />
+                  </div>
 
-              {error && (
-                <p className="text-sm text-red-600 text-center">{error}</p>
+                  {error && (
+                    <p className="text-sm text-red-600 text-center">{error}</p>
+                  )}
+
+                  {/* Step 2: Payment Method Selection */}
+                  {rawAmountDigits && parseInt(rawAmountDigits) >= 100 && (
+                    <div className="space-y-3">
+                      <p className="text-center text-gray-700 font-medium">Escolha a forma de pagamento:</p>
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Credit Card Option */}
+                        <button
+                          onClick={() => setPaymentMethod('card')}
+                          className="flex flex-col items-center justify-center p-6 border-2 border-purple-600 rounded-lg hover:bg-purple-50 transition"
+                        >
+                          <CreditCard className="w-12 h-12 text-purple-600 mb-2" />
+                          <span className="font-semibold text-gray-900">Cartão / Apple Pay</span>
+                          <span className="text-xs text-gray-500 mt-1">Crédito ou débito</span>
+                        </button>
+
+                        {/* Pix Option */}
+                        <button
+                          onClick={() => setPaymentMethod('pix')}
+                          className="flex flex-col items-center justify-center p-6 border-2 border-green-600 rounded-lg hover:bg-green-50 transition"
+                        >
+                          <QrCode className="w-12 h-12 text-green-600 mb-2" />
+                          <span className="font-semibold text-gray-900">Pix</span>
+                          <span className="text-xs text-gray-500 mt-1">Instantâneo</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
-              {clientSecret ? (
-                <Elements stripe={stripePromise} options={{ clientSecret }}>
-                  <PaymentForm onSuccess={handleSuccess} onError={setError} />
-                </Elements>
-              ) : (
-                amount && (
-                  <p className="text-center text-gray-500">
-                    Carregando opções de pagamento...
-                  </p>
-                )
+              {/* Step 3: Card Payment */}
+              {paymentMethod === 'card' && (
+                <div className="space-y-4">
+                  <button
+                    onClick={() => setPaymentMethod(null)}
+                    className="text-sm text-gray-600 hover:text-gray-900"
+                  >
+                    ← Voltar
+                  </button>
+
+                  {clientSecret ? (
+                    <Elements stripe={stripePromise} options={{ clientSecret }}>
+                      <PaymentForm onSuccess={handleSuccess} onError={setError} />
+                    </Elements>
+                  ) : (
+                    <p className="text-center text-gray-500">
+                      Carregando opções de pagamento...
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Step 3: Pix Payment */}
+              {paymentMethod === 'pix' && rawAmountDigits && (
+                <div className="space-y-4">
+                  <button
+                    onClick={() => setPaymentMethod(null)}
+                    className="text-sm text-gray-600 hover:text-gray-900"
+                  >
+                    ← Voltar
+                  </button>
+
+                  <PixPayment
+                    amount={parseInt(rawAmountDigits)}
+                    driverPhoneNumber={phoneNumber}
+                    onSuccess={handleSuccess}
+                    onError={setError}
+                  />
+                </div>
               )}
             </>
           ) : (

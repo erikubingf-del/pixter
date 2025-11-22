@@ -1,17 +1,14 @@
-// src/app/api/stripe/create-payment-intent/route.ts
+// src/app/api/stripe/create-pix-payment/route.ts
 import { NextResponse } from "next/server";
 import { Stripe } from "stripe";
 import { supabaseServer } from "@/lib/supabase/client";
 
-// Initialize Stripe (Use environment variables!)
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_YOUR_KEY", {
   apiVersion: "2022-11-15",
 });
 
 // Helper function to calculate application fee (4% for MVP)
-// This is Pixter's commission - we keep 4%, use ~2-3% for Stripe fees, keep 1-2% profit
 const calculateApplicationFeeAmount = (amount: number): number => {
-  // Amount is already in cents
   return Math.floor(amount * 0.04); // 4% fee, rounded down
 };
 
@@ -27,24 +24,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Identificação do motorista inválida." }, { status: 400 });
     }
 
-    // Amount is already in cents from the frontend (see [phoneNumber]/page.tsx:176)
-    // No conversion needed - Stripe expects integer amount in smallest currency unit
+    // Amount is already in cents from the frontend
     const amountInCents = Math.round(amount);
 
     // 1. Find the driver's profile using the phone number
-    // Assuming phone number is stored in E.164 format in auth.users
-    // We need to join profiles with auth.users or query profiles by a unique identifier derived from phone
-    // For simplicity, let's assume a direct lookup on a formatted phone number in profiles for now
-    // WARNING: This lookup might need adjustment based on your exact schema and how phone numbers are stored/queried.
-    // A better approach might be to query auth.users by phone, get the ID, then query profiles by ID.
-    const formattedPhone = `+${driverPhoneNumber.replace(/\D/g, "")}`; // Ensure E.164
+    const formattedPhone = `+${driverPhoneNumber.replace(/\D/g, "")}`;
 
     const { data: profile, error: profileError } = await supabaseServer
       .from("profiles")
-      .select("id, stripe_account_id") // Select Stripe ID
-      .eq("celular", formattedPhone) // Querying by 'celular' column
+      .select("id, stripe_account_id")
+      .eq("celular", formattedPhone)
       .eq("tipo", "motorista")
-      .maybeSingle(); // Use maybeSingle to handle not found gracefully
+      .maybeSingle();
 
     if (profileError) {
       console.error("Error fetching driver profile:", profileError.message);
@@ -58,37 +49,62 @@ export async function POST(request: Request) {
 
     const stripeAccountId = profile.stripe_account_id;
 
-    // 2. Create a Payment Intent with Stripe
+    // 2. Create a Payment Intent with Pix
     const applicationFee = calculateApplicationFeeAmount(amountInCents);
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInCents,
-      currency: "brl", // Brazilian Real
-      automatic_payment_methods: {
-        enabled: true, // Let Stripe handle payment methods like Card, Pix, etc.
+      currency: "brl",
+      payment_method_types: ["pix"], // Pix only
+      // Pix requires a return URL even though we poll
+      payment_method_options: {
+        pix: {
+          expires_after_seconds: 600, // 10 minutes
+        },
       },
-      // --- Crucial for Connect ---
+      // Destination charge (Stripe Connect)
       transfer_data: {
-        destination: stripeAccountId, // Transfer funds to the connected driver account
+        destination: stripeAccountId,
       },
       // Application Fee (Pixter's 4% commission)
       application_fee_amount: applicationFee,
-      // ---------------------------
       metadata: {
-        driverId: profile.id, // Store driver ID for reconciliation (matches webhook)
-        driverPhoneNumber: formattedPhone, // Store driver phone
-        payingPhoneNumber: driverPhoneNumber, // Store identifier used for payment page
-        applicationFee: applicationFee.toString(), // Store fee for records
+        driverId: profile.id,
+        driverPhoneNumber: formattedPhone,
+        payingPhoneNumber: driverPhoneNumber,
+        applicationFee: applicationFee.toString(),
+        paymentMethod: 'pix',
       },
     });
 
-    // 3. Return the client secret to the frontend
-    return NextResponse.json({ clientSecret: paymentIntent.client_secret });
+    // 3. Get the Pix QR code from the payment intent
+    // For Pix, we need to confirm the payment intent to get the QR code
+    const confirmedPaymentIntent = await stripe.paymentIntents.confirm(paymentIntent.id, {
+      payment_method_data: {
+        type: 'pix',
+      },
+      return_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/pagamento/sucesso`,
+    });
+
+    // Extract Pix code from next_action
+    const pixCode = confirmedPaymentIntent.next_action?.pix_display_qr_code?.data;
+
+    if (!pixCode) {
+      console.error('Failed to generate Pix code:', confirmedPaymentIntent);
+      return NextResponse.json({ error: 'Failed to generate Pix code' }, { status: 500 });
+    }
+
+    // 4. Return the Pix code and payment intent ID to the frontend
+    return NextResponse.json({
+      paymentIntentId: confirmedPaymentIntent.id,
+      pixCode: pixCode,
+      clientSecret: confirmedPaymentIntent.client_secret,
+    });
 
   } catch (error: any) {
-    console.error("Create Payment Intent error:", error);
+    console.error("Create Pix Payment error:", error);
     return NextResponse.json(
-      { error: error.message || "Falha ao iniciar pagamento." },
+      { error: error.message || "Falha ao criar pagamento Pix." },
       { status: 500 }
     );
   }

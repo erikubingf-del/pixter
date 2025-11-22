@@ -63,39 +63,71 @@ export async function POST(request: Request) {
 // --- Handler Functions ---
 
 async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
-  const { id, amount, metadata, currency, status } = paymentIntent;
-  // CORREÇÃO: Use a chave correta definida durante a criação do pagamento
-  const driverId = metadata?.driverId; // <<< Mude de driverProfileId para driverId
+  const { id, amount, metadata, currency, status, charges } = paymentIntent;
+  const driverId = metadata?.driverId;
+  const applicationFee = metadata?.applicationFee ? parseInt(metadata.applicationFee) : 0;
 
   if (!driverId) {
     console.error("Missing driverId in PaymentIntent metadata:", id);
-    return; // Pare o processamento se não pudermos vinculá-lo a um motorista
+    return; // Cannot link payment without driver ID
   }
 
   try {
-    // Upsert no histórico de pagamentos (crie se não existir, atualize se existir)
-    // Assume que stripe_payment_id é único
+    // Get charge details for payment method and receipt
+    const charge = charges?.data?.[0];
+    const chargeId = charge?.id || null;
+    const paymentMethodType = charge?.payment_method_details?.type || null;
+    const receiptUrl = charge?.receipt_url || null;
+
+    // Calculate net amount (amount minus application fee)
+    const netAmount = (amount - applicationFee) / 100; // Convert to BRL
+    const valorTotal = amount / 100; // Total amount in BRL
+    const feeAmount = applicationFee / 100; // Fee in BRL
+
+    // Generate a unique receipt number for manual entry
+    const receiptNumber = `PIX-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+
+    // Upsert payment record
     const { error: upsertError } = await supabaseServer
-      .from("pagamentos") // Certifique-se que a tabela é "pagamentos"
+      .from("pagamentos")
       .upsert({
         stripe_payment_id: id,
-        motorista_id: driverId, // <<< Use a variável driverId corrigida
-        valor: amount / 100, // Converta centavos para a unidade monetária base
+        stripe_charge_id: chargeId,
+        motorista_id: driverId,
+        valor: valorTotal,
         moeda: currency,
         status: status,
-        // created_at é tratado pelo valor padrão ou gatilho
-        // updated_at pode ser definido aqui se necessário
-      }, { onConflict: "stripe_payment_id" }); // Especifique a coluna de conflito
+        metodo: paymentMethodType,
+        application_fee_amount: feeAmount,
+        net_amount: netAmount,
+        receipt_url: receiptUrl,
+        receipt_number: receiptNumber,
+        metadata: {
+          driverPhoneNumber: metadata?.driverPhoneNumber,
+          payingPhoneNumber: metadata?.payingPhoneNumber,
+        },
+        created_at: new Date(paymentIntent.created * 1000).toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "stripe_payment_id" });
 
     if (upsertError) {
-      console.error("Erro ao fazer upsert no histórico de pagamentos:", upsertError.message);
+      console.error("Error upserting payment record:", upsertError.message);
     } else {
-      console.log("Histórico de pagamentos registrado/atualizado para:", id);
-      // Opcionalmente: Acione a notificação para o motorista aqui
+      console.log(`Payment recorded: ${id} - Driver: ${driverId} - Amount: R$ ${valorTotal} - Net: R$ ${netAmount}`);
+
+      // Generate receipt PDF asynchronously (don't block webhook response)
+      fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/receipts/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentId: id }),
+      }).catch(err => console.error('Error triggering receipt generation:', err));
+
+      // TODO: Send notification to driver (email/SMS/push)
+      // TODO: Send receipt to client if cliente_id is available
     }
 
   } catch (error) {
-    console.error("Exceção em handlePaymentIntentSucceeded:", error);
+    console.error("Exception in handlePaymentIntentSucceeded:", error);
   }
 }
 

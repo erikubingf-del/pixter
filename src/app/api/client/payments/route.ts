@@ -1,24 +1,22 @@
+// src/app/api/client/payments/route.ts
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 
-// Define an interface for the expected payment structure after the query
 interface Payment {
   id: string;
-  amount: number;
-  tip_amount: number | null;
-  total_amount: number;
-  payment_method_details: object | null;
-  status: string;
   created_at: string;
-  // Adjust driver_profile to expect an array from the join
-  driver_profile: Array<{ nome: string | null }> | null;
+  valor: number;
+  metodo: string | null;
+  receipt_number: string;
+  receipt_pdf_url: string | null;
+  receipt_url: string | null;
+  status: string;
+  motorista: { nome: string } | null;
 }
 
 export async function GET(request: Request) {
   const cookieStore = cookies();
-  // Define the type for the Supabase client with the database schema
-  // Replace 'any' with your actual Database type if generated
   const supabase = createRouteHandlerClient<any>({ cookies: () => cookieStore });
 
   try {
@@ -39,22 +37,44 @@ export async function GET(request: Request) {
 
     const userId = session.user.id;
 
-    // Fetch payments for the user using the route handler client
-    // Included driver's name via join
-    const { data: payments, error } = await supabase
-      .from('pagamentos') // Ensure this table name is correct
+    // Parse query parameters for filtering
+    const { searchParams } = new URL(request.url);
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+    const search = searchParams.get('search');
+
+    // Build query
+    let query = supabase
+      .from('pagamentos')
       .select(`
         id,
-        amount,
-        tip_amount,
-        total_amount,
-        payment_method_details,
-        status,
         created_at,
-        driver_profile:driver_id ( nome )
+        valor,
+        metodo,
+        receipt_number,
+        receipt_pdf_url,
+        receipt_url,
+        status,
+        motorista:profiles!motorista_id (
+          nome
+        )
       `)
-      .eq('user_id', userId)
+      .eq('cliente_id', userId)
       .order('created_at', { ascending: false });
+
+    // Apply date filters
+    if (startDate) {
+      query = query.gte('created_at', new Date(startDate).toISOString());
+    }
+
+    if (endDate) {
+      const endDateObj = new Date(endDate);
+      endDateObj.setHours(23, 59, 59, 999);
+      query = query.lte('created_at', endDateObj.toISOString());
+    }
+
+    // Execute query
+    const { data: payments, error } = await query;
 
     if (error) {
       console.error('Erro ao buscar pagamentos:', error);
@@ -64,31 +84,26 @@ export async function GET(request: Request) {
       );
     }
 
-    // Ensure payments is treated as an array of Payment objects
-    // Use 'unknown' first for safer type assertion as suggested by the error
-    const typedPayments = payments as unknown as Payment[];
+    // Apply search filter (client-side)
+    let filteredPayments = (payments || []) as Payment[];
 
-    // Format the data for the response
-    const formattedPayments = typedPayments.map(payment => ({
-      id: payment.id,
-      amount: payment.amount / 100, // Assuming amount is in cents
-      tip_amount: (payment.tip_amount || 0) / 100, // Assuming tip is in cents
-      total_amount: payment.total_amount / 100, // Assuming total is in cents
-      payment_method_details: payment.payment_method_details, // e.g., { brand: 'visa', last4: '4242' }
-      status: payment.status,
-      created_at: payment.created_at,
-      // Access the first element of the driver_profile array
-      driver_name: payment.driver_profile && payment.driver_profile.length > 0 ? payment.driver_profile[0]?.nome || 'N/A' : 'N/A'
-    }));
+    if (search && search.trim()) {
+      const searchLower = search.toLowerCase();
+      filteredPayments = filteredPayments.filter(p =>
+        p.motorista?.nome?.toLowerCase().includes(searchLower)
+      );
+    }
 
-    return NextResponse.json({ payments: formattedPayments });
+    return NextResponse.json({
+      payments: filteredPayments,
+      total: filteredPayments.length,
+    });
 
   } catch (error: any) {
     console.error('Erro geral ao buscar pagamentos:', error);
     return NextResponse.json(
-      { error: error.message || 'Erro interno no servidor ao buscar pagamentos' },
+      { error: error.message || 'Erro interno no servidor' },
       { status: 500 }
     );
   }
 }
-

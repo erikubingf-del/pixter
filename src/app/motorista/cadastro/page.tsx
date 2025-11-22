@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { formatCPF, validateCPF, getCPFValidationError } from '@/lib/validators/cpf';
 
 export default function CadastroMotorista() {
   const router = useRouter();
@@ -162,6 +163,11 @@ export default function CadastroMotorista() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nomeCompleto || !cpf || !dataNascimento) return setError('Preencha todos os campos obrigatórios');
+
+    // Validate CPF
+    const cpfError = getCPFValidationError(cpf);
+    if (cpfError) return setError(cpfError);
+
     if (!selfieCapturada) return setError('Capture uma selfie');
     if (!aceitaTermos) return setError('Aceite os termos');
     try {
@@ -312,11 +318,27 @@ export default function CadastroMotorista() {
             <input
               type="text"
               value={cpf}
-              onChange={(e) => setCpf(e.target.value)}
+              onChange={(e) => {
+                const formatted = formatCPF(e.target.value);
+                setCpf(formatted);
+              }}
+              onBlur={() => {
+                // Validate on blur and show error if invalid
+                const error = getCPFValidationError(cpf);
+                if (error && cpf.length > 0) {
+                  setError(error);
+                } else {
+                  setError('');
+                }
+              }}
               required
               placeholder="000.000.000-00"
+              maxLength={14}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
+            {cpf && !validateCPF(cpf) && cpf.replace(/\D/g, '').length === 11 && (
+              <p className="text-xs text-red-600 mt-1">CPF inválido</p>
+            )}
           </div>
 
           {/* profissão */}

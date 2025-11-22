@@ -95,7 +95,7 @@ export default function Home() {
                 </svg>
               </div>
               <h3 className="text-xl font-semibold mb-2">Receba automaticamente</h3>
-              <p className="text-gray-600">O valor cai direto na sua conta bancária, conectado ao Stripe com taxa reduzida de apenas 3%</p>
+              <p className="text-gray-600">O valor cai direto na sua conta bancária, conectado ao Stripe com taxa reduzida de apenas 4%</p>
             </div>
           </div>
         </div>
