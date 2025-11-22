@@ -85,7 +85,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
     const feeAmount = applicationFee / 100; // Fee in BRL
 
     // Generate a unique receipt number for manual entry
-    const receiptNumber = `PIX-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    const receiptNumber = `AMO-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
     // Upsert payment record
     const { error: upsertError } = await supabaseServer

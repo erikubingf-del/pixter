@@ -9,7 +9,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_YOUR_KEY", {
 });
 
 // Helper function to calculate application fee (4% for MVP)
-// This is Pixter's commission - we keep 4%, use ~2-3% for Stripe fees, keep 1-2% profit
+// This is AmoPagar's commission - we keep 4%, use ~2-3% for Stripe fees, keep 1-2% profit
 const calculateApplicationFeeAmount = (amount: number): number => {
   // Amount is already in cents
   return Math.floor(amount * 0.04); // 4% fee, rounded down
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
       transfer_data: {
         destination: stripeAccountId, // Transfer funds to the connected driver account
       },
-      // Application Fee (Pixter's 4% commission)
+      // Application Fee (AmoPagar's 4% commission)
       application_fee_amount: applicationFee,
       // ---------------------------
       metadata: {

@@ -66,7 +66,7 @@ export async function POST(request: Request) {
       transfer_data: {
         destination: stripeAccountId,
       },
-      // Application Fee (Pixter's 4% commission)
+      // Application Fee (AmoPagar's 4% commission)
       application_fee_amount: applicationFee,
       metadata: {
         driverId: profile.id,

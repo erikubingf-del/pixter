@@ -35,7 +35,7 @@ export default function Home() {
                 Receba Pagamentos em QR Code, Sem Maquininha.
               </h1>
               <p className="text-lg text-gray-700 mb-8">
-                Com o Pixter, motoristas, feirantes e vendedores aceitam Pix, Cartão de Crédito e Apple Pay direto pelo celular. Rápido, seguro e sem mensalidade.
+                Com o AmoPagar, motoristas, feirantes e vendedores aceitam Pix, Cartão de Crédito e Apple Pay direto pelo celular. Rápido, seguro e sem mensalidade.
               </p>
               <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
                 <Link 
@@ -48,9 +48,9 @@ export default function Home() {
             </div>
             <div className="md:w-1/2 flex justify-center">
               <div className="relative w-full max-w-md">
-                <Image 
-                  src="/images/homepage/driver.png" 
-                  alt="Motorista usando Pixter"
+                <Image
+                  src="/images/homepage/driver.png"
+                  alt="Motorista usando AmoPagar"
                   width={500}
                   height={400}
                   unoptimized
@@ -74,7 +74,7 @@ export default function Home() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold mb-2">Crie sua conta Pixter</h3>
+              <h3 className="text-xl font-semibold mb-2">Crie sua conta AmoPagar</h3>
               <p className="text-gray-600">Cadastro rápido e gratuito</p>
             </div>
             
@@ -106,7 +106,7 @@ export default function Home() {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-8">Feito para quem vende na rua, na feira, ou dirige pelas cidades.</h2>
           <p className="text-lg text-gray-700 max-w-3xl mx-auto mb-10">
-            Pixter é a solução ideal para motoristas de táxi, vendedores de feira, ambulantes e pequenos negócios que precisam aceitar pagamentos de forma moderna, sem complicação, e sem precisar investir em maquininhas.
+            AmoPagar é a solução ideal para motoristas de táxi, vendedores de feira, ambulantes e pequenos negócios que precisam aceitar pagamentos de forma moderna, sem complicação, e sem precisar investir em maquininhas.
           </p>
         </div>
       </section>
@@ -116,7 +116,7 @@ export default function Home() {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-6">Segurança de nível Stripe</h2>
           <p className="text-lg text-gray-700 max-w-3xl mx-auto mb-10">
-            Todos os pagamentos pelo Pixter são processados com a tecnologia da Stripe, líder global em pagamentos online. Proteção total dos dados e criptografia de ponta a ponta.
+            Todos os pagamentos pelo AmoPagar são processados com a tecnologia da Stripe, líder global em pagamentos online. Proteção total dos dados e criptografia de ponta a ponta.
           </p>
           
           <div className="flex justify-center items-center space-x-8 mt-8">
@@ -133,7 +133,7 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">
-              <p className="text-sm text-gray-600">Pixter © 2025 · Todos os direitos reservados.</p>
+              <p className="text-sm text-gray-600">AmoPagar © 2025 · Todos os direitos reservados.</p>
             </div>
             <div>
               <Link href="/suporte" className="text-sm text-gray-600 hover:text-purple-600 ml-4">Suporte</Link>

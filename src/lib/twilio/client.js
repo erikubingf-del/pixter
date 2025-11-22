@@ -20,7 +20,7 @@ export async function sendVerificationSMS(phoneNumber, code) {
     }
     
     const message = await client.messages.create({
-      body: `Seu código de verificação Pixter é: ${code}`,
+      body: `Seu código de verificação AmoPagar é: ${code}`,
       from: twilioPhone,
       to: phoneNumber
     });

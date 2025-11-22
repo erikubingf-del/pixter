@@ -206,7 +206,7 @@ export default function NavBar() {
       ];
     } else if (userType === "motorista") {
       const driverPublicPageLink = profile?.celular
-        ? `https://pixter-mu.vercel.app/${profile?.celular.replace(
+        ? `https://amopagar.vercel.app/${profile?.celular.replace(
             /\D/g,
             ""
           )}`
@@ -365,10 +365,10 @@ export default function NavBar() {
             <div className="flex-shrink-0">
               <Link href={logoHref} className="flex items-center space-x-2">
                 <div className="w-8 h-8 bg-purple-600 rounded flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">P</span>
+                  <span className="text-white font-bold text-lg">A</span>
                 </div>
                 <span className="font-semibold text-xl text-gray-800">
-                  Pixter
+                  AmoPagar
                 </span>
               </Link>
             </div>

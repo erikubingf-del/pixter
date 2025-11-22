@@ -1,6 +1,6 @@
 /**
  * Receipt HTML Template for PDF Generation
- * Based on receipt.png design, adapted for Pixter
+ * Based on receipt.png design, adapted for AmoPagar
  */
 
 export interface ReceiptData {
@@ -296,7 +296,7 @@ export function generateReceiptHTML(data: ReceiptData): string {
     <div class="header">
       <div class="vendor-info">
         <div class="vendor-name">${data.vendorName}</div>
-        <div class="vendor-tagline">Pagamento via Pixter</div>
+        <div class="vendor-tagline">Pagamento via AmoPagar</div>
         <div class="vendor-details">
           ${data.vendorAddress ? `<div><strong>Endereço:</strong><br>${data.vendorAddress}</div>` : ''}
           ${data.vendorPhone ? `<div style="margin-top: 8px;"><strong>Telefone:</strong> ${data.vendorPhone}</div>` : ''}

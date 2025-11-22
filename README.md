@@ -1,2 +1,2 @@
-# pixter-next
-# pixter-next
+# AmoPagar
+# AmoPagar Payment Platform
