@@ -1,9 +1,9 @@
-// src/app/api/receipts/[chargeId]/route.ts
+// src/app/api/receipts/[id]/route.ts
 
 import { NextResponse } from "next/server";
 import puppeteer from "puppeteer";
 import stripe from "@/lib/stripe/server";
-import { supabaseServer as supabase } from "@/lib/supabase/server"; // Assuming server client for profile lookup
+import { supabaseServer as supabase } from "@/lib/supabase/server";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 
@@ -184,15 +184,39 @@ type DriverProfile = {
 
 export async function GET(
   request: Request,
-  { params }: { params: { chargeId: string } }
+  { params }: { params: { id: string } }
 ) {
-  const chargeId = params.chargeId;
+  const id = params.id;
   const { searchParams } = new URL(request.url);
-  const type = searchParams.get("type") || "client"; // \'client\' or \'driver\'
+  const type = searchParams.get("type") || "client"; // 'client' or 'driver'
   const supabaseAuth = createRouteHandlerClient({ cookies });
 
   try {
-    // 1. Fetch Charge details from Stripe first
+    let chargeId: string;
+
+    // Check if ID is a receipt number (REC-format) or a Stripe charge ID (ch_format)
+    if (id.startsWith('REC-')) {
+      // Handle receipt number - fetch from database first
+      const { data: payment, error: fetchError } = await supabase
+        .from('pagamentos')
+        .select('charge_id, receipt_number')
+        .eq('receipt_number', id)
+        .single();
+
+      if (fetchError || !payment || !payment.charge_id) {
+        return NextResponse.json(
+          { error: 'Receipt not found or has no associated charge' },
+          { status: 404 }
+        );
+      }
+
+      chargeId = payment.charge_id;
+    } else {
+      // Assume it's a direct Stripe charge ID
+      chargeId = id;
+    }
+
+    // 1. Fetch Charge details from Stripe
     const charge = await stripe.charges.retrieve(chargeId, {
       expand: ["customer", "payment_intent", "transfer", "balance_transaction"],
     });
