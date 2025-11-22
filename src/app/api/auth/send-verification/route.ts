@@ -7,15 +7,32 @@ import { formatPhoneNumber } from "@/lib/supabase/client"; // Keep formatPhoneNu
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-
+  console.log("=== send-verification route called ===");
   try {
-    const body = await request.json();
+    console.log("1. Getting cookies...");
+    const cookieStore = await cookies();
+    console.log("2. Creating Supabase client...");
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
+    console.log("3. Parsing request body...");
+    let body;
+    try {
+      body = await request.json();
+      console.log("4. Body parsed successfully:", { phone: body.phone, countryCode: body.countryCode });
+    } catch (parseError) {
+      console.error("JSON parse error:", parseError);
+      return NextResponse.json(
+        { error: "Dados inválidos enviados" },
+        { status: 400 }
+      );
+    }
+
     const { phone, countryCode = "55" } = body;
 
     // 1. Validation
+    console.log("5. Validating phone...");
     if (!phone) {
+      console.log("Phone validation failed - no phone provided");
       return NextResponse.json(
         { error: "Número de telefone é obrigatório" },
         { status: 400 }
@@ -23,7 +40,9 @@ export async function POST(request: Request) {
     }
 
     // 2. Format Phone Number
+    console.log("6. Formatting phone number...");
     const formattedPhone = formatPhoneNumber(phone, countryCode);
+    console.log("7. Formatted phone:", formattedPhone);
 
     // 3. Extract Client IP Address
     const clientIP =
