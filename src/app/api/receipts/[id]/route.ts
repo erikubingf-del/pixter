@@ -191,8 +191,9 @@ export async function GET(
   const type = searchParams.get("type") || "client"; // 'client' or 'driver'
   const supabaseAuth = createRouteHandlerClient({ cookies });
 
+  let chargeId: string | undefined;
+
   try {
-    let chargeId: string;
 
     // Check if ID is a receipt number (REC-format) or a Stripe charge ID (ch_format)
     if (id.startsWith('REC-')) {
@@ -339,7 +340,9 @@ export async function GET(
     // Provide more specific Stripe error messages if available
     let errorMessage = error.message || "Erro ao gerar recibo PDF";
     if (error.type === "StripeInvalidRequestError" && error.code === "resource_missing") {
-        errorMessage = `Cobrança com ID ${chargeId} não encontrada.`;
+        errorMessage = chargeId
+          ? `Cobrança com ID ${chargeId} não encontrada.`
+          : "Cobrança não encontrada.";
     }
     return NextResponse.json(
       { error: errorMessage },
