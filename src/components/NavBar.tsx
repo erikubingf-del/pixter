@@ -363,13 +363,15 @@ export default function NavBar() {
           <div className="flex items-center justify-between h-16">
             {/* Logo - Hidden in simplified view */}
             <div className="flex-shrink-0">
-              <Link href={logoHref} className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-purple-600 rounded flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">A</span>
-                </div>
-                <span className="font-semibold text-xl text-gray-800">
-                  AmoPagar
-                </span>
+              <Link href={logoHref} className="flex items-center">
+                <h1 style={{
+                  fontSize: '1.5rem',
+                  fontWeight: '800',
+                  margin: 0
+                }}>
+                  <span style={{ color: '#8B7DD8' }}>Amo</span>
+                  <span style={{ color: '#81C995' }}>Pagar</span>
+                </h1>
               </Link>
             </div>
 

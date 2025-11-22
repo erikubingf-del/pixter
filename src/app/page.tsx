@@ -8,39 +8,6 @@ export default function Home() {
   return (
     <main className="min-h-screen" style={{ background: 'linear-gradient(135deg, #F0E7FC 0%, #E8F5E9 100%)' }}>
 
-      {/* Header with Logo */}
-      <header style={{
-        padding: '1.5rem 2rem',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <Link href="/" style={{ textDecoration: 'none' }}>
-          <h1 style={{
-            fontSize: '2rem',
-            fontWeight: '800',
-            margin: 0
-          }}>
-            <span style={{ color: '#8B7DD8' }}>Amo</span>
-            <span style={{ color: '#81C995' }}>Pagar</span>
-          </h1>
-        </Link>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <Link href="/login" className="amo-btn" style={{
-            background: 'white',
-            color: '#8B7DD8',
-            padding: '0.5rem 1.5rem'
-          }}>
-            Login
-          </Link>
-          <Link href="/motorista/cadastro" className="amo-btn amo-btn-primary" style={{
-            padding: '0.5rem 1.5rem'
-          }}>
-            Cadastrar
-          </Link>
-        </div>
-      </header>
-
       {/* Hero Section */}
       <section className="amo-hero">
         <div className="amo-container">
