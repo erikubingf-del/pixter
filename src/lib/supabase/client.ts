@@ -11,20 +11,21 @@
 
    /*──────────────── CLIENTES ────────────────────────────*/
    // Server-side instance (uses service key, ONLY for backend/API routes)
-   // Conditionally create client to avoid build-time errors when env vars unavailable
-   export const supabaseServer = (supabaseUrl && supabaseServiceKey)
-     ? createClient(supabaseUrl, supabaseServiceKey, {
-         auth: {
-           persistSession: false,
-           autoRefreshToken: false,
-         }
-       })
-     : createClient('https://placeholder.supabase.co', 'placeholder-key', {
-         auth: {
-           persistSession: false,
-           autoRefreshToken: false,
-         }
-       });
+   // Use placeholder values during build when env vars unavailable
+   // Real values will be used at runtime in Vercel with proper env vars
+   const buildTimeUrl = 'https://xxxxxxxxxxx.supabase.co'; // Valid format for build
+   const buildTimeKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4eHh4eHh4eHh4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTYwMDAwMDAwMCwiZXhwIjoxOTAwMDAwMDAwfQ.placeholder'; // Valid JWT format
+
+   export const supabaseServer = createClient(
+     supabaseUrl || buildTimeUrl,
+     supabaseServiceKey || buildTimeKey,
+     {
+       auth: {
+         persistSession: false,
+         autoRefreshToken: false,
+       }
+     }
+   );
 
    export const supabaseAdmin = supabaseServer;  // alias for Admin API
    
