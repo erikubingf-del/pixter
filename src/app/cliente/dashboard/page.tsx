@@ -500,7 +500,8 @@ export default function UnifiedDashboard() {
               <div style={{
                 background: 'white',
                 borderRadius: 'var(--amo-radius-md)',
-                padding: '1.5rem'
+                padding: '1.5rem',
+                marginBottom: '1.5rem'
               }}>
                 <h3 style={{
                   fontSize: '1.125rem',
@@ -539,6 +540,52 @@ export default function UnifiedDashboard() {
                   )}
                 </div>
               </div>
+
+              {/* Lucro Analytics Link */}
+              <Link
+                href="/motorista/lucro"
+                style={{
+                  display: 'block',
+                  background: 'white',
+                  borderRadius: 'var(--amo-radius-md)',
+                  padding: '1.5rem',
+                  textDecoration: 'none',
+                  border: '2px solid #81C995',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 8px 16px rgba(129, 201, 149, 0.2)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <span style={{ fontSize: '2rem' }}>💰</span>
+                    <div>
+                      <h3 style={{
+                        fontSize: '1.125rem',
+                        fontWeight: '700',
+                        color: '#1F2933',
+                        marginBottom: '0.25rem'
+                      }}>
+                        Ver Meu Lucro
+                      </h3>
+                      <p style={{ fontSize: '0.875rem', color: '#52606D' }}>
+                        Estatísticas, gráficos e análises
+                      </p>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '1.5rem', color: '#81C995' }}>→</span>
+                </div>
+              </Link>
             </div>
           </div>
         )}

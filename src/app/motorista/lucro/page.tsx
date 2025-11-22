@@ -1,0 +1,556 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
+import Link from 'next/link'
+import '../../../styles/amopagar-theme.css'
+
+interface Payment {
+  id: string
+  created_at: string
+  valor: number
+  metodo: string | null
+  status: string
+}
+
+interface Analytics {
+  total: number
+  count: number
+  last30Days: number
+  bestDay: { day: string; total: number } | null
+  bestWeekday: { name: string; average: number } | null
+  byDay: { date: string; total: number }[]
+  byMethod: { method: string; total: number; count: number }[]
+}
+
+const weekdayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+
+export default function LucroPage() {
+  const router = useRouter()
+  const { data: session, status } = useSession()
+
+  const [payments, setPayments] = useState<Payment[]>([])
+  const [analytics, setAnalytics] = useState<Analytics | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [dateRange, setDateRange] = useState('30') // 7, 30, 90 days
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/motorista/login')
+    }
+  }, [status, router])
+
+  // Fetch payments data
+  useEffect(() => {
+    const fetchData = async () => {
+      if (status !== 'authenticated') return
+
+      try {
+        setLoading(true)
+        setError('')
+
+        const res = await fetch(`/api/motorista/lucro?days=${dateRange}`)
+
+        if (!res.ok) {
+          throw new Error('Failed to fetch payments')
+        }
+
+        const data = await res.json()
+        setPayments(data.payments || [])
+
+        // Calculate analytics
+        calculateAnalytics(data.payments || [])
+      } catch (err: any) {
+        console.error('Error fetching payments:', err)
+        setError(err.message || 'Failed to load data')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [status, dateRange])
+
+  const calculateAnalytics = (paymentsData: Payment[]) => {
+    if (paymentsData.length === 0) {
+      setAnalytics({
+        total: 0,
+        count: 0,
+        last30Days: 0,
+        bestDay: null,
+        bestWeekday: null,
+        byDay: [],
+        byMethod: []
+      })
+      return
+    }
+
+    // Total and count
+    const total = paymentsData.reduce((sum, p) => sum + p.valor, 0)
+    const count = paymentsData.length
+
+    // Last 30 days
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    const last30Days = paymentsData
+      .filter(p => new Date(p.created_at) >= thirtyDaysAgo)
+      .reduce((sum, p) => sum + p.valor, 0)
+
+    // Group by day
+    const byDay: { [key: string]: number } = {}
+    paymentsData.forEach(p => {
+      const date = new Date(p.created_at).toISOString().split('T')[0]
+      byDay[date] = (byDay[date] || 0) + p.valor
+    })
+
+    const byDayArray = Object.entries(byDay)
+      .map(([date, total]) => ({ date, total }))
+      .sort((a, b) => b.total - a.total)
+
+    const bestDay = byDayArray.length > 0 ? {
+      day: new Date(byDayArray[0].date).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: 'short'
+      }),
+      total: byDayArray[0].total
+    } : null
+
+    // Group by weekday (only if we have 30+ days of data)
+    let bestWeekday = null
+    if (parseInt(dateRange) >= 30) {
+      const byWeekday: { [key: number]: { total: number; count: number } } = {}
+      paymentsData.forEach(p => {
+        const weekday = new Date(p.created_at).getDay()
+        if (!byWeekday[weekday]) {
+          byWeekday[weekday] = { total: 0, count: 0 }
+        }
+        byWeekday[weekday].total += p.valor
+        byWeekday[weekday].count += 1
+      })
+
+      const weekdayAverages = Object.entries(byWeekday)
+        .map(([day, data]) => ({
+          day: parseInt(day),
+          average: data.total / data.count
+        }))
+        .sort((a, b) => b.average - a.average)
+
+      if (weekdayAverages.length > 0) {
+        bestWeekday = {
+          name: weekdayNames[weekdayAverages[0].day],
+          average: weekdayAverages[0].average
+        }
+      }
+    }
+
+    // Group by payment method
+    const byMethod: { [key: string]: { total: number; count: number } } = {}
+    paymentsData.forEach(p => {
+      const method = p.metodo || 'unknown'
+      if (!byMethod[method]) {
+        byMethod[method] = { total: 0, count: 0 }
+      }
+      byMethod[method].total += p.valor
+      byMethod[method].count += 1
+    })
+
+    const byMethodArray = Object.entries(byMethod)
+      .map(([method, data]) => ({
+        method: method === 'pix' ? '📱 Pix' : method === 'card' ? '💳 Cartão' : '💰 Outro',
+        total: data.total,
+        count: data.count
+      }))
+      .sort((a, b) => b.total - a.total)
+
+    setAnalytics({
+      total,
+      count,
+      last30Days,
+      bestDay,
+      bestWeekday,
+      byDay: byDayArray.slice(0, 30), // Last 30 days for chart
+      byMethod: byMethodArray
+    })
+  }
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(amount)
+  }
+
+  if (status === 'loading' || loading) {
+    return (
+      <main style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #F0E7FC 0%, #E8F5E9 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          width: '48px',
+          height: '48px',
+          border: '4px solid rgba(129, 201, 149, 0.2)',
+          borderTop: '4px solid #81C995',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite'
+        }}></div>
+        <style jsx>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </main>
+    )
+  }
+
+  if (!session) {
+    return null
+  }
+
+  return (
+    <main style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #E8F5E9 0%, #F0E7FC 100%)',
+      padding: '2rem 1rem'
+    }}>
+      <div className="amo-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
+        {/* Header */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '2rem',
+          flexWrap: 'wrap',
+          gap: '1rem'
+        }}>
+          <div>
+            <h1 style={{
+              fontSize: '2rem',
+              fontWeight: '800',
+              color: '#1F2933',
+              marginBottom: '0.25rem'
+            }}>
+              💰 Meu Lucro
+            </h1>
+            <p style={{ color: '#52606D', fontSize: '0.95rem' }}>
+              Acompanhe seus ganhos e estatísticas
+            </p>
+          </div>
+          <Link href="/cliente/dashboard" className="amo-btn amo-btn-outline">
+            ← Voltar ao Dashboard
+          </Link>
+        </div>
+
+        {/* Date Range Filter */}
+        <div className="amo-card" style={{ marginBottom: '1.5rem' }}>
+          <div style={{
+            display: 'flex',
+            gap: '0.75rem',
+            flexWrap: 'wrap'
+          }}>
+            <button
+              onClick={() => setDateRange('7')}
+              className={`amo-btn ${dateRange === '7' ? 'amo-btn-secondary' : 'amo-btn-outline'}`}
+            >
+              Últimos 7 dias
+            </button>
+            <button
+              onClick={() => setDateRange('30')}
+              className={`amo-btn ${dateRange === '30' ? 'amo-btn-secondary' : 'amo-btn-outline'}`}
+            >
+              Últimos 30 dias
+            </button>
+            <button
+              onClick={() => setDateRange('90')}
+              className={`amo-btn ${dateRange === '90' ? 'amo-btn-secondary' : 'amo-btn-outline'}`}
+            >
+              Últimos 90 dias
+            </button>
+          </div>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div style={{
+            background: '#FEE2E2',
+            border: '2px solid #FCA5A5',
+            borderRadius: 'var(--amo-radius-md)',
+            padding: '1rem',
+            marginBottom: '1.5rem',
+            color: '#991B1B',
+            fontSize: '0.875rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <span>⚠️</span>
+            <span>{error}</span>
+          </div>
+        )}
+
+        {analytics && (
+          <>
+            {/* Stats Grid */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+              gap: '1.5rem',
+              marginBottom: '1.5rem'
+            }}>
+              {/* Total Revenue */}
+              <div className="amo-card amo-fade-in" style={{
+                background: 'linear-gradient(135deg, #81C995 0%, #D4FC79 100%)',
+                color: 'white'
+              }}>
+                <p style={{
+                  fontSize: '0.875rem',
+                  opacity: 0.9,
+                  marginBottom: '0.5rem'
+                }}>
+                  Faturamento Total
+                </p>
+                <p style={{
+                  fontSize: '2rem',
+                  fontWeight: '800'
+                }}>
+                  {formatCurrency(analytics.total)}
+                </p>
+                <p style={{
+                  fontSize: '0.875rem',
+                  opacity: 0.9,
+                  marginTop: '0.5rem'
+                }}>
+                  {analytics.count} pagamento{analytics.count !== 1 ? 's' : ''}
+                </p>
+              </div>
+
+              {/* Last 30 Days */}
+              <div className="amo-card amo-fade-in">
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: '#52606D',
+                  marginBottom: '0.5rem'
+                }}>
+                  Últimos 30 dias
+                </p>
+                <p style={{
+                  fontSize: '2rem',
+                  fontWeight: '800',
+                  color: '#1F2933'
+                }}>
+                  {formatCurrency(analytics.last30Days)}
+                </p>
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: '#81C995',
+                  marginTop: '0.5rem'
+                }}>
+                  📈 {((analytics.last30Days / analytics.total) * 100).toFixed(0)}% do total
+                </p>
+              </div>
+
+              {/* Best Day */}
+              {analytics.bestDay && (
+                <div className="amo-card amo-fade-in">
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#52606D',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Melhor Dia
+                  </p>
+                  <p style={{
+                    fontSize: '2rem',
+                    fontWeight: '800',
+                    color: '#1F2933'
+                  }}>
+                    {formatCurrency(analytics.bestDay.total)}
+                  </p>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#8B7DD8',
+                    marginTop: '0.5rem'
+                  }}>
+                    🏆 {analytics.bestDay.day}
+                  </p>
+                </div>
+              )}
+
+              {/* Best Weekday (only show if 30+ days of data) */}
+              {analytics.bestWeekday && parseInt(dateRange) >= 30 && (
+                <div className="amo-card amo-fade-in">
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#52606D',
+                    marginBottom: '0.5rem'
+                  }}>
+                    Melhor Dia da Semana
+                  </p>
+                  <p style={{
+                    fontSize: '1.5rem',
+                    fontWeight: '800',
+                    color: '#1F2933',
+                    marginBottom: '0.5rem'
+                  }}>
+                    {analytics.bestWeekday.name}
+                  </p>
+                  <p style={{
+                    fontSize: '0.875rem',
+                    color: '#81C995'
+                  }}>
+                    📊 Média: {formatCurrency(analytics.bestWeekday.average)}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Payment Methods Breakdown */}
+            <div className="amo-card amo-fade-in" style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{
+                fontSize: '1.25rem',
+                fontWeight: '700',
+                color: '#1F2933',
+                marginBottom: '1.5rem'
+              }}>
+                💳 Por Forma de Pagamento
+              </h2>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {analytics.byMethod.map((item, index) => {
+                  const percentage = (item.total / analytics.total) * 100
+                  return (
+                    <div key={index}>
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '0.5rem'
+                      }}>
+                        <span style={{
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          color: '#1F2933'
+                        }}>
+                          {item.method}
+                        </span>
+                        <span style={{
+                          fontSize: '0.875rem',
+                          color: '#52606D'
+                        }}>
+                          {formatCurrency(item.total)} ({item.count} pag.)
+                        </span>
+                      </div>
+                      <div style={{
+                        width: '100%',
+                        height: '8px',
+                        background: '#F9FAFB',
+                        borderRadius: 'var(--amo-radius-full)',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          width: `${percentage}%`,
+                          height: '100%',
+                          background: 'linear-gradient(90deg, #81C995 0%, #D4FC79 100%)',
+                          borderRadius: 'var(--amo-radius-full)',
+                          transition: 'width 0.3s ease'
+                        }}></div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Daily Chart */}
+            <div className="amo-card amo-fade-in">
+              <h2 style={{
+                fontSize: '1.25rem',
+                fontWeight: '700',
+                color: '#1F2933',
+                marginBottom: '1.5rem'
+              }}>
+                📈 Faturamento por Dia
+              </h2>
+
+              {analytics.byDay.length > 0 ? (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem',
+                  maxHeight: '400px',
+                  overflowY: 'auto'
+                }}>
+                  {analytics.byDay.map((item, index) => {
+                    const maxValue = Math.max(...analytics.byDay.map(d => d.total))
+                    const percentage = (item.total / maxValue) * 100
+
+                    return (
+                      <div key={index} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '1rem'
+                      }}>
+                        <span style={{
+                          fontSize: '0.75rem',
+                          color: '#9AA5B1',
+                          minWidth: '60px',
+                          textAlign: 'right'
+                        }}>
+                          {new Date(item.date).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: 'short'
+                          })}
+                        </span>
+                        <div style={{
+                          flex: 1,
+                          height: '32px',
+                          background: '#F9FAFB',
+                          borderRadius: 'var(--amo-radius-md)',
+                          overflow: 'hidden',
+                          position: 'relative'
+                        }}>
+                          <div style={{
+                            width: `${percentage}%`,
+                            height: '100%',
+                            background: 'linear-gradient(90deg, #81C995 0%, #D4FC79 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            paddingLeft: '0.75rem',
+                            transition: 'width 0.3s ease'
+                          }}>
+                            <span style={{
+                              fontSize: '0.875rem',
+                              fontWeight: '600',
+                              color: 'white',
+                              textShadow: '0 1px 2px rgba(0,0,0,0.2)'
+                            }}>
+                              {formatCurrency(item.total)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div style={{
+                  padding: '3rem 1rem',
+                  textAlign: 'center',
+                  color: '#9AA5B1'
+                }}>
+                  <p>Nenhum dado disponível para o período selecionado</p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </main>
+  )
+}
