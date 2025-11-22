@@ -336,7 +336,6 @@ function CheckoutForm({
   // Pix-specific state
   const [pixPayload, setPixPayload] = useState<string | null>(null)
   const [pixQrCode, setPixQrCode] = useState<string | null>(null)
-  const [pixReceiptNumber, setPixReceiptNumber] = useState<string | null>(null)
   const [showPixCode, setShowPixCode] = useState(false)
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -412,27 +411,9 @@ function CheckoutForm({
           }
         })
 
-        // Create payment record in database
-        const paymentRes = await fetch('/api/pix/create-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            motorista_id: profile.id,
-            valor: amountInCents / 100,
-            pix_payload: payload
-          })
-        })
-
-        if (!paymentRes.ok) {
-          const errorData = await paymentRes.json()
-          throw new Error(errorData.error || 'Failed to create Pix payment')
-        }
-
-        const paymentData = await paymentRes.json()
-
+        // Just show the Pix code - driver will manually confirm payment later
         setPixPayload(payload)
         setPixQrCode(qrCodeDataUrl)
-        setPixReceiptNumber(paymentData.receiptNumber)
         setShowPixCode(true)
         setSubmitting(false)
       } else {
@@ -498,20 +479,10 @@ function CheckoutForm({
           <p style={{
             fontSize: '1.5rem',
             fontWeight: '700',
-            color: '#81C995',
-            marginBottom: '0.5rem'
+            color: '#81C995'
           }}>
             {formatAmount(amount)}
           </p>
-          {pixReceiptNumber && (
-            <p style={{
-              fontSize: '0.875rem',
-              color: '#52606D',
-              fontFamily: 'monospace'
-            }}>
-              Recibo: {pixReceiptNumber}
-            </p>
-          )}
         </div>
 
         {/* QR Code */}
@@ -613,7 +584,6 @@ function CheckoutForm({
             setShowPixCode(false)
             setPixPayload(null)
             setPixQrCode(null)
-            setPixReceiptNumber(null)
           }}
           className="amo-btn amo-btn-outline"
           style={{ width: '100%' }}

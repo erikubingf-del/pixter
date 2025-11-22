@@ -49,6 +49,14 @@ export default function LucroPage() {
   const [error, setError] = useState('')
   const [dateRange, setDateRange] = useState('30') // 7, 30, 90 days
 
+  // Pix payment entry
+  const [showPixForm, setShowPixForm] = useState(false)
+  const [pixAmount, setPixAmount] = useState('')
+  const [pixDescription, setPixDescription] = useState('')
+  const [savingPix, setSavingPix] = useState(false)
+  const [pixSuccess, setPixSuccess] = useState('')
+  const [pixError, setPixError] = useState('')
+
   // Redirect if not authenticated
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -93,6 +101,59 @@ export default function LucroPage() {
 
     fetchData()
   }, [status, dateRange])
+
+  const handleAddPixPayment = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    const amount = parseFloat(pixAmount)
+    if (isNaN(amount) || amount <= 0) {
+      setPixError('Valor inválido')
+      return
+    }
+
+    setSavingPix(true)
+    setPixError('')
+    setPixSuccess('')
+
+    try {
+      const res = await fetch('/api/motorista/add-pix-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          valor: amount,
+          descricao: pixDescription || 'Pagamento via Pix'
+        })
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.error || 'Failed to add payment')
+      }
+
+      setPixSuccess(`✅ Pagamento de R$ ${amount.toFixed(2)} adicionado!`)
+      setPixAmount('')
+      setPixDescription('')
+
+      // Refresh payments list
+      const paymentsRes = await fetch(`/api/motorista/lucro?days=${dateRange}`)
+      if (paymentsRes.ok) {
+        const data = await paymentsRes.json()
+        setPayments(data.payments || [])
+        calculateAnalytics(data.payments || [])
+      }
+
+      // Close form after 2 seconds
+      setTimeout(() => {
+        setShowPixForm(false)
+        setPixSuccess('')
+      }, 2000)
+    } catch (err: any) {
+      console.error('Error adding Pix payment:', err)
+      setPixError(err.message || 'Erro ao adicionar pagamento')
+    } finally {
+      setSavingPix(false)
+    }
+  }
 
   const calculateAnalytics = (paymentsData: Payment[]) => {
     if (paymentsData.length === 0) {
@@ -262,10 +323,120 @@ export default function LucroPage() {
               Acompanhe seus ganhos e estatísticas
             </p>
           </div>
-          <Link href="/cliente/dashboard" className="amo-btn amo-btn-outline">
-            ← Voltar ao Dashboard
-          </Link>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setShowPixForm(!showPixForm)}
+              className="amo-btn amo-btn-secondary"
+            >
+              {showPixForm ? '❌ Cancelar' : '📱 Adicionar Pix'}
+            </button>
+            <Link href="/cliente/dashboard" className="amo-btn amo-btn-outline">
+              ← Voltar ao Dashboard
+            </Link>
+          </div>
         </div>
+
+        {/* Add Pix Payment Form */}
+        {showPixForm && (
+          <div className="amo-card amo-fade-in" style={{ marginBottom: '1.5rem' }}>
+            <h3 style={{
+              fontSize: '1.125rem',
+              fontWeight: '700',
+              color: '#1F2933',
+              marginBottom: '1rem'
+            }}>
+              📱 Adicionar Pagamento Pix
+            </h3>
+            <p style={{
+              fontSize: '0.875rem',
+              color: '#52606D',
+              marginBottom: '1.5rem'
+            }}>
+              Recebeu um pagamento via Pix? Adicione aqui para contabilizar no seu lucro.
+            </p>
+
+            <form onSubmit={handleAddPixPayment} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div>
+                <label htmlFor="pixAmount" style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#1F2933',
+                  marginBottom: '0.5rem'
+                }}>
+                  Valor recebido (R$)
+                </label>
+                <input
+                  id="pixAmount"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={pixAmount}
+                  onChange={(e) => setPixAmount(e.target.value)}
+                  className="amo-input"
+                  placeholder="0.00"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label htmlFor="pixDescription" style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#1F2933',
+                  marginBottom: '0.5rem'
+                }}>
+                  Descrição (opcional)
+                </label>
+                <input
+                  id="pixDescription"
+                  type="text"
+                  value={pixDescription}
+                  onChange={(e) => setPixDescription(e.target.value)}
+                  className="amo-input"
+                  placeholder="Ex: Cliente João Silva"
+                />
+              </div>
+
+              {pixError && (
+                <div style={{
+                  background: '#FEE2E2',
+                  border: '2px solid #FCA5A5',
+                  borderRadius: 'var(--amo-radius-md)',
+                  padding: '0.75rem',
+                  color: '#991B1B',
+                  fontSize: '0.875rem'
+                }}>
+                  ⚠️ {pixError}
+                </div>
+              )}
+
+              {pixSuccess && (
+                <div style={{
+                  background: '#D1FAE5',
+                  border: '2px solid #6EE7B7',
+                  borderRadius: 'var(--amo-radius-md)',
+                  padding: '0.75rem',
+                  color: '#065F46',
+                  fontSize: '0.875rem'
+                }}>
+                  {pixSuccess}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={savingPix}
+                className="amo-btn amo-btn-secondary"
+                style={{ width: '100%', opacity: savingPix ? 0.5 : 1 }}
+              >
+                {savingPix ? 'Salvando...' : '✅ Confirmar Pagamento'}
+              </button>
+            </form>
+          </div>
+        )}
 
         {/* Stripe Connection Status Banner */}
         {stripeStatus && (
