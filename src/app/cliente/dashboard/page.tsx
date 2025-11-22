@@ -68,9 +68,10 @@ export default function UnifiedDashboard() {
         setError('')
 
         // Fetch profile
+        let profileData: any = null
         const profileRes = await fetch('/api/profile')
         if (profileRes.ok) {
-          const profileData = await profileRes.json()
+          profileData = await profileRes.json()
           setProfile(profileData.profile)
         }
 
@@ -82,7 +83,7 @@ export default function UnifiedDashboard() {
         }
 
         // Fetch Stripe status if driver
-        if (profileData.profile?.tipo === 'motorista') {
+        if (profileData?.profile?.tipo === 'motorista') {
           const stripeRes = await fetch('/api/stripe/status')
           if (stripeRes.ok) {
             const stripeData = await stripeRes.json()
