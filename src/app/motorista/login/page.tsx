@@ -1,10 +1,10 @@
-// src/app/motorista/login/page.tsx
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
+import '../../../styles/amopagar-theme.css';
 
 export default function MotoristaLogin() {
   const router = useRouter();
@@ -15,26 +15,33 @@ export default function MotoristaLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [otp, setOtp] = useState("");
 
-  // --- OTP state & refs ---
-  const [otp, setOtp] = useState<string>('');
-  const inputRefs = useRef<Array<HTMLInputElement | null>>(Array(6).fill(null));
+  // Countdown timer
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [countdown]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-    setOtp(value);
+  const formatPhone = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 2) return numbers;
+    if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && otp.length > 0) {
-      setOtp(prev => prev.slice(0, -1));
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '');
+    if (value.length <= 11) {
+      setPhone(value);
     }
   };
 
-  // 1) Send the 6-digit code via your API
   const enviarCodigo = async () => {
-    if (!phone.trim()) {
-      return setError("Por favor, informe seu número de WhatsApp");
+    if (!phone.trim() || phone.length < 10) {
+      return setError("Por favor, informe um número de celular válido");
     }
     setLoading(true);
     setError("");
@@ -49,197 +56,317 @@ export default function MotoristaLogin() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erro ao enviar código");
 
+      setSuccess("Código enviado! Verifique seu WhatsApp.");
       setCodeSent(true);
       setCountdown(60);
-      setSuccess("Código enviado! Verifique seu WhatsApp.");
-
-      // start 60s countdown
-      const timer = setInterval(() => {
-        setCountdown((c) => {
-          if (c <= 1) {
-            clearInterval(timer);
-            return 0;
-          }
-          return c - 1;
-        });
-      }, 1000);
-    } catch (e: any) {
-      console.error(e);
-      setError(e.message || "Falha ao enviar código");
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // 2) Verify the joined OTP via NextAuth
   const verificarCodigo = async () => {
-    if (otp.length < 6) {
-      return setError("Por favor, insira o código completo");
+    if (otp.length !== 6) {
+      return setError("Por favor, insira o código de 6 dígitos");
     }
     setLoading(true);
     setError("");
-    setSuccess("");
 
     try {
-      console.log('Attempting phone OTP sign in with:', { phone, code: otp, countryCode });
-      
       const result = await signIn("phone-otp", {
         redirect: false,
         phone,
         code: otp,
         countryCode,
-        callbackUrl: "/motorista/dashboard/overview"
+        callbackUrl: "/motorista/dashboard",
       });
 
-      console.log('Sign in result:', result);
-
       if (result?.error) {
-        console.error('Sign in error:', result.error);
-        if (result.error === 'CredentialsSignin') {
-          setError('Código inválido ou expirado. Por favor, tente novamente.');
-        } else {
-          setError(result.error);
-        }
-      } else if (result?.ok) {
-        // always land on driver dashboard
-        router.push("/motorista/dashboard/overview");
-      } else {
-        setError("Erro ao verificar código");
+        throw new Error(result.error === "CredentialsSignin"
+          ? "Código inválido ou expirado"
+          : result.error);
       }
-    } catch (e: any) {
-      console.error(e);
-      setError(e.message || "Erro ao verificar código");
-    } finally {
+
+      if (result?.url) {
+        router.push(result.url);
+      } else {
+        router.push("/motorista/dashboard");
+      }
+    } catch (err: any) {
+      setError(err.message);
       setLoading(false);
     }
   };
 
+  const handleOtpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setOtp(value);
+  };
+
   return (
-    <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white p-8 rounded-lg shadow">
-        <div className="text-center mb-6">
-          <Link href="/" className="text-3xl font-bold">
-            Pixter
+    <main style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #E8F5E9 0%, #F0E7FC 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '2rem 1rem'
+    }}>
+      <div className="amo-card amo-fade-in" style={{
+        maxWidth: '480px',
+        width: '100%',
+        padding: '3rem'
+      }}>
+        {/* Logo & Header */}
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <Link href="/" style={{ textDecoration: 'none' }}>
+            <h1 style={{
+              fontSize: '2.5rem',
+              fontWeight: '800',
+              marginBottom: '0.5rem'
+            }}>
+              <span style={{ color: '#8B7DD8' }}>Amo</span>
+              <span style={{ color: '#81C995' }}>Pagar</span>
+            </h1>
           </Link>
-          <h2 className="mt-4 text-2xl">Login de Motorista</h2>
-          <p className="text-sm text-gray-600">Use seu WhatsApp para entrar</p>
+          <h2 style={{
+            fontSize: '1.5rem',
+            fontWeight: '700',
+            color: '#1F2933',
+            marginBottom: '0.5rem'
+          }}>
+            {codeSent ? 'Digite o código' : 'Login para Motoristas'}
+          </h2>
+          <p style={{ color: '#52606D', fontSize: '0.95rem' }}>
+            {codeSent
+              ? 'Enviamos um código de 6 dígitos para seu WhatsApp'
+              : 'Entre com seu número de celular'}
+          </p>
         </div>
 
+        {/* Error Message */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded mb-4">
-            {error}
+          <div style={{
+            background: '#FEE2E2',
+            border: '2px solid #FCA5A5',
+            borderRadius: 'var(--amo-radius-md)',
+            padding: '1rem',
+            marginBottom: '1.5rem',
+            color: '#991B1B',
+            fontSize: '0.875rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <span>⚠️</span>
+            <span>{error}</span>
           </div>
         )}
+
+        {/* Success Message */}
         {success && (
-          <div className="bg-green-50 border border-green-200 text-green-700 p-3 rounded mb-4">
-            {success}
+          <div style={{
+            background: '#D1FAE5',
+            border: '2px solid #6EE7B7',
+            borderRadius: 'var(--amo-radius-md)',
+            padding: '1rem',
+            marginBottom: '1.5rem',
+            color: '#065F46',
+            fontSize: '0.875rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <span>✓</span>
+            <span>{success}</span>
           </div>
         )}
 
         {!codeSent ? (
-          <>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              WhatsApp (com DDD)
-            </label>
-            <div className="flex mb-4">
-              <span className="inline-flex items-center px-3 bg-gray-100 border border-r-0 border-gray-300 rounded-l">
-                +{countryCode}
-              </span>
+          // Phone Input Step
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div>
+              <label htmlFor="phone" style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: '#1F2933',
+                marginBottom: '0.5rem'
+              }}>
+                Número de Celular (WhatsApp)
+              </label>
               <input
+                id="phone"
                 type="tel"
-                autoComplete="tel"
-                required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                disabled={loading}
-                placeholder="11 98765-4321"
-                className={`flex-1 border border-gray-300 rounded-r px-4 py-3 text-base ${ // Increased padding and text size
-                  loading ? "bg-gray-100" : ""
-                }`}
+                value={formatPhone(phone)}
+                onChange={handlePhoneChange}
+                placeholder="(11) 99999-9999"
+                className="amo-input"
+                autoFocus
               />
             </div>
+
             <button
               onClick={enviarCodigo}
-              disabled={loading || !phone.trim()}
-              className={`w-full py-3 rounded text-white font-medium ${ // Increased padding
-                loading || !phone.trim()
-                  ? "bg-purple-300 cursor-not-allowed"
-                  : "bg-purple-600 hover:bg-purple-700"
-              }`}
+              disabled={loading || phone.length < 10}
+              className="amo-btn amo-btn-secondary"
+              style={{ width: '100%' }}
             >
-              {loading ? "Enviando…" : "Enviar código"}
+              {loading ? (
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  <span style={{
+                    width: '16px',
+                    height: '16px',
+                    border: '2px solid rgba(255,255,255,0.3)',
+                    borderTop: '2px solid white',
+                    borderRadius: '50%',
+                    animation: 'spin 0.6s linear infinite'
+                  }}></span>
+                  Enviando...
+                </span>
+              ) : (
+                <>📱 Enviar código via WhatsApp</>
+              )}
             </button>
-          </>
+          </div>
         ) : (
-          <>
-            <p className="text-center text-gray-700 mb-4">
-              Insira o código de 6 dígitos que enviamos
-            </p>
-            <div className="flex justify-center gap-3 mb-6">
-              {/* Hidden actual input that handles all typing */}
+          // OTP Input Step
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div>
+              <label htmlFor="otp" style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: '#1F2933',
+                marginBottom: '0.5rem'
+              }}>
+                Código de Verificação
+              </label>
               <input
+                id="otp"
                 type="text"
                 inputMode="numeric"
                 value={otp}
-                onChange={handleChange}
-                onKeyDown={handleKeyDown}
-                autoComplete="one-time-code"
-                className="absolute opacity-0 w-0 h-0"
-                ref={el => inputRefs.current[0] = el}
+                onChange={handleOtpChange}
+                placeholder="000000"
+                className="amo-input"
+                style={{
+                  textAlign: 'center',
+                  fontSize: '1.5rem',
+                  letterSpacing: '0.5rem'
+                }}
+                autoFocus
+                maxLength={6}
               />
-              
-              {/* Visual boxes */}
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div 
-                  key={i}
-                  onClick={() => inputRefs.current[0]?.focus()}
-                  className={`
-                    w-12 h-14 flex items-center justify-center
-                    border rounded-md text-2xl font-semibold
-                    ${i < otp.length ? 'border-purple-500 bg-purple-50' : 'border-gray-300'}
-                  `}
-                >
-                  {otp[i] || ''}
-                </div>
-              ))}
             </div>
+
             <button
               onClick={verificarCodigo}
-              disabled={loading || otp.length < 6}
-              className={`w-full mt-2 py-3 rounded text-white font-medium ${ // Increased padding
-                loading || otp.length < 6
-                  ? "bg-purple-300 cursor-not-allowed"
-                  : "bg-purple-600 hover:bg-purple-700"
-              }`}
+              disabled={loading || otp.length !== 6}
+              className="amo-btn amo-btn-secondary"
+              style={{ width: '100%' }}
             >
-              {loading ? "Verificando…" : "Entrar"}
+              {loading ? (
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  <span style={{
+                    width: '16px',
+                    height: '16px',
+                    border: '2px solid rgba(255,255,255,0.3)',
+                    borderTop: '2px solid white',
+                    borderRadius: '50%',
+                    animation: 'spin 0.6s linear infinite'
+                  }}></span>
+                  Verificando...
+                </span>
+              ) : (
+                'Entrar'
+              )}
             </button>
-            {countdown > 0 ? (
-              <p className="text-sm text-gray-500 mt-3 text-center">
-                Reenviar em {countdown}s
-              </p>
-            ) : (
-              <button
-                onClick={enviarCodigo}
-                disabled={loading}
-                className="mt-3 text-sm text-purple-600 hover:underline w-full text-center" // Centered resend button
-              >
-                Reenviar código
-              </button>
-            )}
-          </>
+
+            {/* Resend Code */}
+            <div style={{ textAlign: 'center', fontSize: '0.875rem', color: '#52606D' }}>
+              {countdown > 0 ? (
+                <span>Reenviar código em {countdown}s</span>
+              ) : (
+                <button
+                  onClick={enviarCodigo}
+                  disabled={loading}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#81C995',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  Reenviar código
+                </button>
+              )}
+            </div>
+
+            {/* Change Number */}
+            <button
+              onClick={() => {
+                setCodeSent(false);
+                setOtp('');
+                setError('');
+                setSuccess('');
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#52606D',
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                textDecoration: 'underline'
+              }}
+            >
+              ← Alterar número
+            </button>
+          </div>
         )}
 
-        <div className="mt-6 text-center text-sm text-gray-500">
-          Não tem conta?{" "}
-          <Link
-            href="/motorista/cadastro"
-            className="text-purple-600 hover:underline"
-          >
-            Cadastre-se
-          </Link>
+        {/* Footer Links */}
+        <div style={{
+          marginTop: '2rem',
+          paddingTop: '2rem',
+          borderTop: '1px solid #E4E7EB',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.75rem',
+          alignItems: 'center',
+          fontSize: '0.875rem'
+        }}>
+          <p style={{ color: '#52606D' }}>
+            Não tem uma conta?{' '}
+            <Link href="/motorista/cadastro" style={{
+              color: '#81C995',
+              fontWeight: '600',
+              textDecoration: 'none'
+            }}>
+              Cadastre-se
+            </Link>
+          </p>
+          <p style={{ color: '#52606D' }}>
+            É cliente?{' '}
+            <Link href="/login" style={{
+              color: '#8B7DD8',
+              fontWeight: '600',
+              textDecoration: 'none'
+            }}>
+              Acesse aqui
+            </Link>
+          </p>
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </main>
   );
 }
