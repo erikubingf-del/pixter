@@ -48,19 +48,39 @@ export default function MotoristaLogin() {
     setSuccess("");
 
     try {
+      console.log("Sending verification code for phone:", phone);
       const res = await fetch("/api/auth/send-verification", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, countryCode }),
       });
-      const data = await res.json();
+
+      console.log("Response status:", res.status);
+
+      // Check if response has content
+      const text = await res.text();
+      console.log("Response text:", text);
+
+      if (!text) {
+        throw new Error("Servidor não respondeu corretamente. Tente novamente.");
+      }
+
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        console.error("Failed to parse response:", text);
+        throw new Error("Resposta inválida do servidor. Tente novamente.");
+      }
+
       if (!res.ok) throw new Error(data.error || "Erro ao enviar código");
 
       setSuccess("Código enviado! Verifique seu WhatsApp.");
       setCodeSent(true);
       setCountdown(60);
     } catch (err: any) {
-      setError(err.message);
+      console.error("Error in enviarCodigo:", err);
+      setError(err.message || "Erro ao enviar código");
     } finally {
       setLoading(false);
     }
