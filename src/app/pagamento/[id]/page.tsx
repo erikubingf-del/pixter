@@ -25,6 +25,10 @@ type Profile = {
   nome?: string
   avatar_url?: string
   celular?: string
+  cpf?: string
+  company_name?: string
+  pix_key?: string
+  stripe_account_id?: string
 }
 
 function formatDisplayPhoneNumber(e164Phone?: string): string {
@@ -253,7 +257,7 @@ export default function PaginaPagamento() {
             }}>
               {profile.nome?.charAt(0).toUpperCase() || '💳'}
             </div>
-            <div>
+            <div style={{ flex: 1 }}>
               <p style={{
                 fontSize: '0.875rem',
                 color: '#52606D',
@@ -264,15 +268,24 @@ export default function PaginaPagamento() {
               <h2 style={{
                 fontSize: '1.5rem',
                 fontWeight: '700',
-                color: '#1F2933'
+                color: '#1F2933',
+                marginBottom: '0.25rem'
               }}>
                 {profile.nome || "Motorista"}
               </h2>
-              {profile.celular && (
-                <p style={{ fontSize: '0.875rem', color: '#9AA5B1' }}>
-                  {formatDisplayPhoneNumber(profile.celular)}
+              {profile.company_name && (
+                <p style={{ fontSize: '0.875rem', color: '#52606D', marginBottom: '0.25rem' }}>
+                  {profile.company_name}
                 </p>
               )}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', fontSize: '0.875rem', color: '#9AA5B1' }}>
+                {profile.celular && (
+                  <span>{formatDisplayPhoneNumber(profile.celular)}</span>
+                )}
+                {profile.cpf && (
+                  <span>CPF: {profile.cpf}</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -282,36 +295,23 @@ export default function PaginaPagamento() {
           <Elements stripe={stripePromise} options={options}>
             <CheckoutForm
               paymentIntentId={paymentIntentId}
-              driverName={profile.nome || "Motorista"}
+              profile={profile}
             />
           </Elements>
-        </div>
-
-        {/* Security Badge */}
-        <div style={{
-          textAlign: 'center',
-          marginTop: '1.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '0.5rem',
-          color: '#9AA5B1',
-          fontSize: '0.875rem'
-        }}>
-          <span>🔒</span>
-          <span>Pagamento seguro via Stripe</span>
         </div>
       </div>
     </main>
   )
 }
 
+type PaymentMethod = 'pix' | 'card'
+
 function CheckoutForm({
   paymentIntentId,
-  driverName
+  profile
 }: {
   paymentIntentId: string
-  driverName: string
+  profile: Profile
 }) {
   const stripe = useStripe()
   const elements = useElements()
@@ -322,6 +322,19 @@ function CheckoutForm({
   const [amountError, setAmountError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Determine available payment methods
+  const hasPixKey = !!profile.pix_key
+  const hasStripe = !!profile.stripe_account_id
+
+  // Default to Pix if available, otherwise Card
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
+    hasPixKey ? 'pix' : 'card'
+  )
+
+  // Pix-specific state
+  const [pixPayload, setPixPayload] = useState<string | null>(null)
+  const [showPixCode, setShowPixCode] = useState(false)
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, "")
@@ -352,7 +365,7 @@ function CheckoutForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!stripe || !elements || !amount) return
+    if (!amount) return
 
     const amountInCents = parseInt(amount, 10)
 
@@ -366,37 +379,176 @@ function CheckoutForm({
     setAmountError(null)
 
     try {
-      // Update the Payment Intent with the final amount
-      const updateRes = await fetch("/api/stripe/update-payment-intent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentIntentId, amount: amountInCents }),
-      })
-      const updateData = await updateRes.json()
-      if (!updateRes.ok) {
-        throw new Error(updateData.error || "Erro ao atualizar valor do pagamento.")
-      }
+      if (paymentMethod === 'pix') {
+        // Generate Pix payload
+        const { generatePixPayload } = await import('@/lib/pix/generator')
 
-      // Confirm the payment
-      const { error: stripeError } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          return_url:
-            typeof window !== "undefined"
-              ? `${window.location.origin}/pagamento/sucesso?driverId=${driverIdentifier}`
-              : undefined,
-        },
-      })
+        const payload = generatePixPayload({
+          pixKey: profile.pix_key!,
+          merchantName: profile.nome || 'Motorista',
+          merchantCity: 'SAO PAULO', // TODO: Get from profile or use default
+          amount: amountInCents / 100, // Convert cents to BRL
+          description: profile.company_name || undefined,
+        })
 
-      if (stripeError) {
-        console.error("Stripe confirmation error:", stripeError)
-        throw new Error(stripeError.message || "Ocorreu um erro durante a confirmação do pagamento.")
+        setPixPayload(payload)
+        setShowPixCode(true)
+        setSubmitting(false)
+      } else {
+        // Card payment via Stripe
+        if (!stripe || !elements) {
+          throw new Error('Stripe não carregado')
+        }
+
+        // Update the Payment Intent with the final amount
+        const updateRes = await fetch("/api/stripe/update-payment-intent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paymentIntentId, amount: amountInCents }),
+        })
+        const updateData = await updateRes.json()
+        if (!updateRes.ok) {
+          throw new Error(updateData.error || "Erro ao atualizar valor do pagamento.")
+        }
+
+        // Confirm the payment
+        const { error: stripeError } = await stripe.confirmPayment({
+          elements,
+          confirmParams: {
+            return_url:
+              typeof window !== "undefined"
+                ? `${window.location.origin}/pagamento/sucesso?driverId=${driverIdentifier}`
+                : undefined,
+          },
+        })
+
+        if (stripeError) {
+          console.error("Stripe confirmation error:", stripeError)
+          throw new Error(stripeError.message || "Ocorreu um erro durante a confirmação do pagamento.")
+        }
       }
     } catch (err: any) {
       console.error("Payment submission error:", err)
       setError(err.message || "Ocorreu um erro.")
       setSubmitting(false)
     }
+  }
+
+  const handleCopyPix = () => {
+    if (pixPayload) {
+      navigator.clipboard.writeText(pixPayload)
+      alert('Código Pix copiado!')
+    }
+  }
+
+  // If showing Pix code, render the Pix payment screen
+  if (showPixCode && pixPayload) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div style={{ textAlign: 'center' }}>
+          <h3 style={{
+            fontSize: '1.25rem',
+            fontWeight: '700',
+            color: '#1F2933',
+            marginBottom: '0.5rem'
+          }}>
+            📱 Pague com Pix
+          </h3>
+          <p style={{
+            fontSize: '1.5rem',
+            fontWeight: '700',
+            color: '#81C995',
+            marginBottom: '1rem'
+          }}>
+            {formatAmount(amount)}
+          </p>
+        </div>
+
+        {/* TODO: Add QR Code here */}
+        <div style={{
+          background: '#F9FAFB',
+          borderRadius: 'var(--amo-radius-md)',
+          padding: '1.5rem',
+          textAlign: 'center'
+        }}>
+          <p style={{
+            fontSize: '0.875rem',
+            color: '#52606D',
+            marginBottom: '1rem'
+          }}>
+            QR Code será exibido aqui
+          </p>
+          <p style={{
+            fontSize: '0.75rem',
+            color: '#9AA5B1'
+          }}>
+            (Implementação do QR code pendente)
+          </p>
+        </div>
+
+        {/* Copia e Cola */}
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '0.875rem',
+            fontWeight: '600',
+            color: '#1F2933',
+            marginBottom: '0.5rem'
+          }}>
+            Ou copie o código Pix:
+          </label>
+          <div style={{
+            background: '#F9FAFB',
+            borderRadius: 'var(--amo-radius-md)',
+            padding: '1rem',
+            border: '2px solid #E4E7EB',
+            wordBreak: 'break-all',
+            fontSize: '0.75rem',
+            fontFamily: 'monospace',
+            color: '#52606D',
+            maxHeight: '100px',
+            overflow: 'auto'
+          }}>
+            {pixPayload}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleCopyPix}
+          className="amo-btn amo-btn-secondary"
+          style={{ width: '100%' }}
+        >
+          📋 Copiar Código Pix
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setShowPixCode(false)
+            setPixPayload(null)
+          }}
+          className="amo-btn amo-btn-outline"
+          style={{ width: '100%' }}
+        >
+          ← Voltar
+        </button>
+
+        {/* Security Badge */}
+        <div style={{
+          textAlign: 'center',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.5rem',
+          color: '#9AA5B1',
+          fontSize: '0.875rem'
+        }}>
+          <span>🔒</span>
+          <span>Pagamento seguro via Pix</span>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -442,19 +594,133 @@ function CheckoutForm({
         )}
       </div>
 
-      {/* Payment Method */}
-      <div>
-        <label style={{
-          display: 'block',
-          fontSize: '0.875rem',
-          fontWeight: '600',
-          color: '#1F2933',
-          marginBottom: '0.75rem'
+      {/* Payment Method Toggle - Only show if both methods available */}
+      {hasPixKey && hasStripe && (
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '0.875rem',
+            fontWeight: '600',
+            color: '#1F2933',
+            marginBottom: '0.75rem',
+            textAlign: 'center'
+          }}>
+            Forma de Pagamento
+          </label>
+          <div style={{
+            display: 'flex',
+            gap: '0.5rem',
+            background: '#F9FAFB',
+            padding: '0.25rem',
+            borderRadius: 'var(--amo-radius-md)',
+            border: '2px solid #E4E7EB'
+          }}>
+            <button
+              type="button"
+              onClick={() => setPaymentMethod('pix')}
+              style={{
+                flex: 1,
+                padding: '0.75rem',
+                borderRadius: 'var(--amo-radius-sm)',
+                border: 'none',
+                background: paymentMethod === 'pix'
+                  ? 'linear-gradient(135deg, #81C995 0%, #6EE7B7 100%)'
+                  : 'transparent',
+                color: paymentMethod === 'pix' ? 'white' : '#52606D',
+                fontWeight: '600',
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              📱 Pix
+            </button>
+            <button
+              type="button"
+              onClick={() => setPaymentMethod('card')}
+              style={{
+                flex: 1,
+                padding: '0.75rem',
+                borderRadius: 'var(--amo-radius-sm)',
+                border: 'none',
+                background: paymentMethod === 'card'
+                  ? 'linear-gradient(135deg, #8B7DD8 0%, #A78BFA 100%)'
+                  : 'transparent',
+                color: paymentMethod === 'card' ? 'white' : '#52606D',
+                fontWeight: '600',
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              💳 Cartão
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Method Details */}
+      {paymentMethod === 'card' ? (
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '0.875rem',
+            fontWeight: '600',
+            color: '#1F2933',
+            marginBottom: '0.75rem'
+          }}>
+            {hasPixKey && hasStripe ? 'Dados do Cartão' : 'Forma de Pagamento'}
+          </label>
+          <PaymentElement id="payment-element" options={{ layout: "tabs" }} />
+        </div>
+      ) : (
+        <div style={{
+          background: 'linear-gradient(135deg, #D1FAE5 0%, #E8F5E9 100%)',
+          borderRadius: 'var(--amo-radius-md)',
+          padding: '1.5rem',
+          border: '2px solid #6EE7B7'
         }}>
-          Forma de Pagamento
-        </label>
-        <PaymentElement id="payment-element" options={{ layout: "tabs" }} />
-      </div>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            marginBottom: '0.75rem'
+          }}>
+            <span style={{ fontSize: '2rem' }}>📱</span>
+            <div>
+              <h4 style={{
+                fontSize: '1rem',
+                fontWeight: '700',
+                color: '#065F46',
+                marginBottom: '0.25rem'
+              }}>
+                Pagamento via Pix
+              </h4>
+              <p style={{ fontSize: '0.875rem', color: '#059669' }}>
+                Rápido, seguro e sem taxas
+              </p>
+            </div>
+          </div>
+          <ul style={{
+            fontSize: '0.875rem',
+            color: '#047857',
+            paddingLeft: '1.25rem',
+            margin: 0
+          }}>
+            <li>Dinheiro cai na hora</li>
+            <li>Disponível 24/7</li>
+            <li>100% seguro pelo Banco Central</li>
+          </ul>
+        </div>
+      )}
 
       {/* Error Message */}
       {error && (
@@ -477,13 +743,25 @@ function CheckoutForm({
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={!stripe || !elements || submitting || !!amountError || !amount || parseInt(amount, 10) <= 0}
-        className="amo-btn amo-btn-secondary"
+        disabled={
+          submitting ||
+          !!amountError ||
+          !amount ||
+          parseInt(amount, 10) <= 0 ||
+          (paymentMethod === 'card' && (!stripe || !elements))
+        }
+        className={paymentMethod === 'pix' ? 'amo-btn amo-btn-secondary' : 'amo-btn amo-btn-primary'}
         style={{
           width: '100%',
           fontSize: '1.125rem',
           padding: '1rem',
-          opacity: (!stripe || !elements || submitting || !!amountError || !amount || parseInt(amount, 10) <= 0) ? 0.5 : 1
+          opacity: (
+            submitting ||
+            !!amountError ||
+            !amount ||
+            parseInt(amount, 10) <= 0 ||
+            (paymentMethod === 'card' && (!stripe || !elements))
+          ) ? 0.5 : 1
         }}
       >
         {submitting ? (
@@ -499,9 +777,29 @@ function CheckoutForm({
             Processando...
           </span>
         ) : (
-          <>💳 Pagar {amount ? formatAmount(amount) : ""}</>
+          <>
+            {paymentMethod === 'pix' ? '📱 Gerar Pix' : '💳 Pagar'} {amount ? formatAmount(amount) : ""}
+          </>
         )}
       </button>
+
+      {/* Security Badge */}
+      <div style={{
+        textAlign: 'center',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '0.5rem',
+        color: '#9AA5B1',
+        fontSize: '0.875rem'
+      }}>
+        <span>🔒</span>
+        <span>
+          {paymentMethod === 'pix'
+            ? 'Pagamento seguro via Pix'
+            : 'Pagamento seguro via Stripe'}
+        </span>
+      </div>
 
       <style jsx>{`
         @keyframes spin {

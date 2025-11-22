@@ -19,10 +19,10 @@ export async function GET(
     const digits = raw.replace(/\D/g, "");
     const e164 = digits.startsWith("55") ? `+${digits}` : `+55${digits}`;
 
-    // fetch exactly what we need (including stripe_account_id so we can check “connected”)
+    // fetch exactly what we need (including stripe_account_id and pix_key for payment methods)
     const { data: prof, error } = await supabaseServer
       .from("profiles")
-      .select("id, nome, profissao, avatar_url, stripe_account_id, celular, tipo")
+      .select("id, nome, profissao, avatar_url, stripe_account_id, pix_key, celular, cpf, company_name, tipo")
       .eq("celular", e164)
       .eq("tipo", "motorista")
       .maybeSingle();
@@ -40,7 +40,8 @@ export async function GET(
         { status: 404 }
       );
     }
-    if (!prof.stripe_account_id) {
+    // Driver must have at least one payment method configured
+    if (!prof.stripe_account_id && !prof.pix_key) {
       return NextResponse.json(
         { error: "Motorista não habilitado para pagamentos." },
         { status: 404 }
@@ -54,6 +55,10 @@ export async function GET(
       profissao: prof.profissao,
       avatar_url: prof.avatar_url,
       celular: prof.celular,
+      cpf: prof.cpf,
+      company_name: prof.company_name,
+      pix_key: prof.pix_key,
+      stripe_account_id: prof.stripe_account_id,
     };
 
     return NextResponse.json({ profile });
