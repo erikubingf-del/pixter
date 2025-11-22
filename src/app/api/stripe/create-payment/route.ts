@@ -12,7 +12,7 @@ const MIN_AMOUNT_BRL = 1.00; // Minimum payment amount in BRL
 const PLATFORM_FEE_PERCENTAGE = 0.1; // 10% platform fee
 
 export async function POST(request: Request) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore }); // For auth check
 
   try {

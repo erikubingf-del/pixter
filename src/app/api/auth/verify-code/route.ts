@@ -7,7 +7,7 @@ import { verifyCode, deleteVerificationCode, formatPhoneNumber } from "@/lib/sup
 // Removed: import type { PhoneOtpType } from "@supabase/supabase-js";
 
 export async function POST(request: Request) {
-  const cookieStore = cookies(); // Get cookie store
+  const cookieStore = await cookies(); // Get cookie store
   // Create Supabase client capable of handling cookies
   const supabaseAuth = createRouteHandlerClient({ cookies: () => cookieStore });
 

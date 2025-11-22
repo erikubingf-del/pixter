@@ -8,7 +8,7 @@ import {
 } from "@/lib/supabase/client";
 
 export async function POST(request: Request) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
   try {

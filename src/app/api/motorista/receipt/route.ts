@@ -33,7 +33,7 @@ const formatPaymentMethod = (method: string | null | undefined, details: any) =>
 };
 
 export async function GET(request: Request) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
   try {

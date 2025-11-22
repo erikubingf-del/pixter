@@ -16,7 +16,7 @@ interface Payment {
 }
 
 export async function GET(request: Request) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerClient<any>({ cookies: () => cookieStore });
 
   try {

@@ -4,8 +4,10 @@ import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { formatPhoneNumber } from "@/lib/supabase/client"; // Keep formatPhoneNumber helper
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
 
   try {
