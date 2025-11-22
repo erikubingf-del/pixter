@@ -7,18 +7,26 @@
    /*──────────────── VARIÁVEIS DE AMBIENTE ───────────────*/
    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // Make sure this is defined in your server environment variables
+   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-   if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
-     throw new Error('Missing Supabase environment variables');
-   }
-   
    /*──────────────── CLIENTES ────────────────────────────*/
-   // Client-side instance (safe for browser) - REMOVED to use Auth Helpers
-   // export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-   // Server-side instance (uses service key, ONLY for backend/API routes)
-   export const supabaseServer = createClient(supabaseUrl, supabaseServiceKey);
-   export const supabaseAdmin  = supabaseServer;  // alias for Admin API
+   // Lazy-loaded server client to avoid build-time errors when env vars aren't available
+   function getSupabaseServer() {
+     if (!supabaseUrl || !supabaseServiceKey) {
+       throw new Error('Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+     }
+     return createClient(supabaseUrl, supabaseServiceKey);
+   }
+
+   // Export as getter to ensure lazy evaluation
+   export const supabaseServer = new Proxy({} as ReturnType<typeof createClient>, {
+     get: (target, prop) => {
+       const client = getSupabaseServer();
+       return (client as any)[prop];
+     }
+   });
+
+   export const supabaseAdmin = supabaseServer;  // alias for Admin API
    
    /*──────────────── EMAIL/PASSWORD SIGNUP (Client-Side) ──*/
    // Added back based on user request, with fix for unconfirmed emails
