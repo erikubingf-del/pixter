@@ -4,6 +4,9 @@ import { authOptions } from '@/lib/auth'
 import { supabaseServer } from '@/lib/supabase/client'
 import { rateLimit } from '@/middleware/rate-limit'
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * Driver manually adds a Pix payment they received
  * Simple flow: Driver confirms they received payment, we add it to their revenue

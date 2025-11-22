@@ -6,6 +6,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/options";
 import { supabaseServer } from "@/lib/supabase/client";
 
+export const dynamic = 'force-dynamic';
+
+
 // Pre-defined response for when Stripe is not available or configured
 const DEFAULT_RESPONSE = {
   balance: { 

@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseServer } from '@/lib/supabase/client'
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * Advanced analytics for drivers
  * Future: Gate behind premium subscription

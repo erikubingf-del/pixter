@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseServer } from '@/lib/supabase/client'
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * Driver confirms a pending Pix payment was received
  * Changes status from 'pending' to 'succeeded'

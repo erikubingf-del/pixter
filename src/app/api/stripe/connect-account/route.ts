@@ -5,6 +5,9 @@ import { getServerSession } from "next-auth/next"; // Import getServerSession
 import { authOptions } from "@/lib/auth/options"; // Import authOptions from the new location
 import { supabaseServer } from "@/lib/supabase/client"; // Use the server client (service role) for DB operations
 
+export const dynamic = 'force-dynamic';
+
+
 // Initialize Stripe (Use environment variables!)
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { // Added non-null assertion assuming it's set
   apiVersion: "2022-11-15",

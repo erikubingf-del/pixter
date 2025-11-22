@@ -4,6 +4,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/options";
 import { supabaseServer } from "@/lib/supabase/client";
 
+export const dynamic = 'force-dynamic';
+
+
 // Define the list of valid avatar paths for validation
 const VALID_AVATAR_PATHS = Array.from({ length: 9 }, (_, i) => `/images/avatars/avatar_${i + 1}.png`);
 

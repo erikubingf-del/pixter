@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseServer } from '@/lib/supabase/client'
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * Driver deletes a pending Pix payment (customer didn't pay)
  * Only pending payments can be deleted

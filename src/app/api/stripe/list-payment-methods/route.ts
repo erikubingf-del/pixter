@@ -4,6 +4,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/options"; // Adjust path as needed
 import { Stripe } from "stripe";
 
+export const dynamic = 'force-dynamic';
+
+
 // Initialize Stripe (Use environment variables!)
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_YOUR_KEY", {
   apiVersion: "2022-11-15", // Use your desired API version

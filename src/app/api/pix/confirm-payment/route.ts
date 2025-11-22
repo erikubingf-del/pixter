@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseServer } from '@/lib/supabase/client'
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * Confirm a Pix payment (driver confirms they received the payment)
  * This is a manual confirmation flow since Pix doesn't have automatic webhooks

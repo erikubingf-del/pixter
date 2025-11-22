@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseServer } from '@/lib/supabase/client'
 
+export const dynamic = 'force-dynamic';
+
+
 /**
  * Link Invoice by Receipt Number
  *
