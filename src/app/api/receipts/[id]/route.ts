@@ -7,6 +7,8 @@ import { supabaseServer as supabase } from "@/lib/supabase/server";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 
+export const dynamic = 'force-dynamic';
+
 // Constants
 const PIXTER_FEE_PERCENTAGE = 0.03;
 const COMPANY_NAME = "Pixter";
@@ -189,7 +191,8 @@ export async function GET(
   const id = params.id;
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type") || "client"; // 'client' or 'driver'
-  const supabaseAuth = createRouteHandlerClient({ cookies });
+  const cookieStore = await cookies();
+  const supabaseAuth = createRouteHandlerClient({ cookies: () => cookieStore });
 
   let chargeId: string | undefined;
 

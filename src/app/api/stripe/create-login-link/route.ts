@@ -4,10 +4,13 @@ import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { supabaseServer } from "@/lib/supabase/client";
 
+export const dynamic = 'force-dynamic';
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2022-11-15" });
 
 export async function GET(request: Request) {
-  const supabaseAuth = createRouteHandlerClient({ cookies });
+  const cookieStore = await cookies();
+  const supabaseAuth = createRouteHandlerClient({ cookies: () => cookieStore });
   try {
     const { data: { session } } = await supabaseAuth.auth.getSession();
     if (!session?.user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
