@@ -12,7 +12,7 @@ interface Payment {
   receipt_pdf_url: string | null;
   receipt_url: string | null;
   status: string;
-  motorista: { nome: string } | null;
+  motorista: { nome: string } | { nome: string }[] | null;
 }
 
 export async function GET(request: Request) {
@@ -84,14 +84,25 @@ export async function GET(request: Request) {
       );
     }
 
+    // Normalize the data - convert array to single object if needed
+    const normalizedPayments = (payments || []).map((payment: any) => ({
+      ...payment,
+      motorista: Array.isArray(payment.motorista)
+        ? payment.motorista[0] || null
+        : payment.motorista
+    })) as Payment[];
+
     // Apply search filter (client-side)
-    let filteredPayments = (payments || []) as Payment[];
+    let filteredPayments = normalizedPayments;
 
     if (search && search.trim()) {
       const searchLower = search.toLowerCase();
-      filteredPayments = filteredPayments.filter(p =>
-        p.motorista?.nome?.toLowerCase().includes(searchLower)
-      );
+      filteredPayments = filteredPayments.filter(p => {
+        const motoristaNome = Array.isArray(p.motorista)
+          ? p.motorista[0]?.nome
+          : p.motorista?.nome;
+        return motoristaNome?.toLowerCase().includes(searchLower);
+      });
     }
 
     return NextResponse.json({
