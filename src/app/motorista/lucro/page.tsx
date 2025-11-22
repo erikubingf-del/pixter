@@ -43,13 +43,18 @@ export default function LucroPage() {
   const { data: session, status } = useSession()
 
   const [payments, setPayments] = useState<Payment[]>([])
+  const [pendingPayments, setPendingPayments] = useState<Payment[]>([])
   const [analytics, setAnalytics] = useState<Analytics | null>(null)
   const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [dateRange, setDateRange] = useState('30') // 7, 30, 90 days
 
-  // Pix payment entry
+  // Pending payment actions
+  const [confirmingPaymentId, setConfirmingPaymentId] = useState<string | null>(null)
+  const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null)
+
+  // Pix payment entry (legacy - keeping for manual additions)
   const [showPixForm, setShowPixForm] = useState(false)
   const [pixAmount, setPixAmount] = useState('')
   const [pixDescription, setPixDescription] = useState('')
@@ -80,10 +85,17 @@ export default function LucroPage() {
         }
 
         const data = await res.json()
-        setPayments(data.payments || [])
+        const allPayments = data.payments || []
 
-        // Calculate analytics
-        calculateAnalytics(data.payments || [])
+        // Separate pending and succeeded payments
+        const succeeded = allPayments.filter((p: Payment) => p.status === 'succeeded')
+        const pending = allPayments.filter((p: Payment) => p.status === 'pending')
+
+        setPayments(succeeded)
+        setPendingPayments(pending)
+
+        // Calculate analytics (only from succeeded payments)
+        calculateAnalytics(succeeded)
 
         // Fetch Stripe status
         const stripeRes = await fetch('/api/stripe/status')
@@ -138,8 +150,12 @@ export default function LucroPage() {
       const paymentsRes = await fetch(`/api/motorista/lucro?days=${dateRange}`)
       if (paymentsRes.ok) {
         const data = await paymentsRes.json()
-        setPayments(data.payments || [])
-        calculateAnalytics(data.payments || [])
+        const allPayments = data.payments || []
+        const succeeded = allPayments.filter((p: Payment) => p.status === 'succeeded')
+        const pending = allPayments.filter((p: Payment) => p.status === 'pending')
+        setPayments(succeeded)
+        setPendingPayments(pending)
+        calculateAnalytics(succeeded)
       }
 
       // Close form after 2 seconds
@@ -152,6 +168,69 @@ export default function LucroPage() {
       setPixError(err.message || 'Erro ao adicionar pagamento')
     } finally {
       setSavingPix(false)
+    }
+  }
+
+  const handleConfirmPayment = async (paymentId: string) => {
+    setConfirmingPaymentId(paymentId)
+
+    try {
+      const res = await fetch('/api/motorista/confirm-pix-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_id: paymentId })
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.error || 'Failed to confirm payment')
+      }
+
+      // Refresh payments list
+      const paymentsRes = await fetch(`/api/motorista/lucro?days=${dateRange}`)
+      if (paymentsRes.ok) {
+        const data = await paymentsRes.json()
+        const allPayments = data.payments || []
+        const succeeded = allPayments.filter((p: Payment) => p.status === 'succeeded')
+        const pending = allPayments.filter((p: Payment) => p.status === 'pending')
+        setPayments(succeeded)
+        setPendingPayments(pending)
+        calculateAnalytics(succeeded)
+      }
+    } catch (err: any) {
+      console.error('Error confirming payment:', err)
+      alert('Erro ao confirmar pagamento: ' + (err.message || 'Erro desconhecido'))
+    } finally {
+      setConfirmingPaymentId(null)
+    }
+  }
+
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!confirm('Tem certeza que deseja excluir este pagamento pendente?')) {
+      return
+    }
+
+    setDeletingPaymentId(paymentId)
+
+    try {
+      const res = await fetch('/api/motorista/delete-pix-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_id: paymentId })
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.error || 'Failed to delete payment')
+      }
+
+      // Remove from pending list
+      setPendingPayments(prev => prev.filter(p => p.id !== paymentId))
+    } catch (err: any) {
+      console.error('Error deleting payment:', err)
+      alert('Erro ao excluir pagamento: ' + (err.message || 'Erro desconhecido'))
+    } finally {
+      setDeletingPaymentId(null)
     }
   }
 
@@ -555,6 +634,108 @@ export default function LucroPage() {
                   {stripeStatus.connected ? 'Gerenciar Conta Stripe' : 'Conectar Stripe Agora'} →
                 </Link>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Pending Payments Section */}
+        {pendingPayments.length > 0 && (
+          <div className="amo-card amo-fade-in" style={{
+            marginBottom: '1.5rem',
+            background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+            border: '2px solid #F59E0B'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              marginBottom: '1rem'
+            }}>
+              <span style={{ fontSize: '1.5rem' }}>⏳</span>
+              <h3 style={{
+                fontSize: '1.125rem',
+                fontWeight: '700',
+                color: '#1F2933',
+                margin: 0
+              }}>
+                Pagamentos Pix Pendentes ({pendingPayments.length})
+              </h3>
+            </div>
+            <p style={{
+              fontSize: '0.875rem',
+              color: '#92400E',
+              marginBottom: '1rem'
+            }}>
+              Estes links Pix foram gerados mas ainda não foram confirmados. Confirme quando receber o pagamento ou exclua se não for pago.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {pendingPayments.map((payment) => (
+                <div
+                  key={payment.id}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    borderRadius: 'var(--amo-radius-md)',
+                    padding: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    flexWrap: 'wrap'
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: '150px' }}>
+                    <p style={{
+                      fontSize: '1.125rem',
+                      fontWeight: '700',
+                      color: '#1F2933',
+                      marginBottom: '0.25rem'
+                    }}>
+                      R$ {payment.valor.toFixed(2)}
+                    </p>
+                    <p style={{
+                      fontSize: '0.75rem',
+                      color: '#9AA5B1'
+                    }}>
+                      {new Date(payment.created_at).toLocaleString('pt-BR', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                    <button
+                      onClick={() => handleConfirmPayment(payment.id)}
+                      disabled={confirmingPaymentId === payment.id}
+                      className="amo-btn amo-btn-secondary"
+                      style={{
+                        padding: '0.5rem 1rem',
+                        fontSize: '0.875rem',
+                        opacity: confirmingPaymentId === payment.id ? 0.5 : 1
+                      }}
+                    >
+                      {confirmingPaymentId === payment.id ? '...' : '✅ Confirmar'}
+                    </button>
+                    <button
+                      onClick={() => handleDeletePayment(payment.id)}
+                      disabled={deletingPaymentId === payment.id}
+                      className="amo-btn amo-btn-outline"
+                      style={{
+                        padding: '0.5rem 1rem',
+                        fontSize: '0.875rem',
+                        opacity: deletingPaymentId === payment.id ? 0.5 : 1,
+                        borderColor: '#EF4444',
+                        color: '#EF4444'
+                      }}
+                    >
+                      {deletingPaymentId === payment.id ? '...' : '🗑️ Excluir'}
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

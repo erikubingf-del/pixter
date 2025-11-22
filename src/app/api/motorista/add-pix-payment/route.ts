@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseServer } from '@/lib/supabase/client'
+import { rateLimit } from '@/middleware/rate-limit'
 
 /**
  * Driver manually adds a Pix payment they received
@@ -15,6 +16,23 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
+      )
+    }
+
+    // Rate limiting: Max 10 Pix entries per user per minute (prevents spam/accidents)
+    const rateLimitResult = rateLimit(`add-pix:${session.user.email}`, 10, 60000)
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Muitas tentativas. Aguarde um momento e tente novamente.' },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': '10',
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': rateLimitResult.resetTime.toString()
+          }
+        }
       )
     }
 

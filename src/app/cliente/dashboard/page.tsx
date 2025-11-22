@@ -106,7 +106,10 @@ export default function UnifiedDashboard() {
 
     try {
       const QRCode = (await import('qrcode')).default
-      const paymentUrl = `${window.location.origin}/${profile.celular}`
+      // Remove non-digits and strip country code (55) for cleaner URLs
+      const digitsOnly = profile.celular.replace(/\D/g, '')
+      const phoneForUrl = digitsOnly.startsWith('55') ? digitsOnly.substring(2) : digitsOnly
+      const paymentUrl = `${window.location.origin}/${phoneForUrl}`
       const qrDataUrl = await QRCode.toDataURL(paymentUrl, {
         width: 400,
         margin: 2,
@@ -162,7 +165,10 @@ export default function UnifiedDashboard() {
   // Copy payment link
   const copyPaymentLink = () => {
     if (!profile?.celular) return
-    const link = `${window.location.origin}/${profile.celular}`
+    // Remove non-digits and strip country code (55) for cleaner URLs
+    const digitsOnly = profile.celular.replace(/\D/g, '')
+    const phoneForUrl = digitsOnly.startsWith('55') ? digitsOnly.substring(2) : digitsOnly
+    const link = `${window.location.origin}/${phoneForUrl}`
     navigator.clipboard.writeText(link)
   }
 

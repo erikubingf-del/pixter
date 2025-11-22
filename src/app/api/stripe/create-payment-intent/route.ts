@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { Stripe } from "stripe";
 import { supabaseServer } from "@/lib/supabase/client";
+import { rateLimit } from "@/middleware/rate-limit";
 
 // Initialize Stripe (Use environment variables!)
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_YOUR_KEY", {
@@ -18,6 +19,24 @@ const calculateApplicationFeeAmount = (amount: number): number => {
 export async function POST(request: Request) {
   try {
     const { amount, driverPhoneNumber } = await request.json();
+
+    // Rate limiting: Max 5 payment intents per IP per minute
+    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    const rateLimitResult = rateLimit(`payment-intent:${ip}`, 5, 60000)
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Muitas tentativas. Aguarde um momento e tente novamente.' },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': '5',
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': rateLimitResult.resetTime.toString()
+          }
+        }
+      )
+    }
 
     // Basic validation
     if (!amount || typeof amount !== "number" || amount <= 0) {

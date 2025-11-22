@@ -26,8 +26,10 @@ export async function GET(request: NextRequest) {
     }
 
     // 2. Construct the public payment URL
-    const formattedPhoneForUrl = profile.celular.replace(/\D/g, ""); // Remove non-digits
-    const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"; // Get base URL
+    // Remove non-digits and strip country code (55) for Brazilian numbers
+    const digitsOnly = profile.celular.replace(/\D/g, "");
+    const formattedPhoneForUrl = digitsOnly.startsWith("55") ? digitsOnly.substring(2) : digitsOnly;
+    const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const paymentUrl = `${origin}/${formattedPhoneForUrl}`;
 
     // 3. Generate QR Code as Data URL

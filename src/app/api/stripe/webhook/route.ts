@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { Stripe } from "stripe";
 import { supabaseServer } from "@/lib/supabase/client"; // Use Service Role Key
+import { rateLimit } from "@/middleware/rate-limit";
 
 // Initialize Stripe (Use environment variables!)
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_YOUR_KEY", {
@@ -12,6 +13,19 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_YOUR_KEY", {
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "whsec_YOUR_SECRET";
 
 export async function POST(request: Request) {
+  // Rate limiting: Max 100 webhook calls per minute (prevents spam/replay attacks)
+  // More lenient than other endpoints since Stripe webhooks are authenticated
+  const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'stripe-webhook'
+  const rateLimitResult = rateLimit(`webhook:${ip}`, 100, 60000)
+
+  if (!rateLimitResult.success) {
+    console.error('Webhook rate limit exceeded from IP:', ip)
+    return NextResponse.json(
+      { error: 'Too many webhook requests' },
+      { status: 429 }
+    )
+  }
+
   const payload = await request.text();
   const signature = request.headers.get("stripe-signature") || "";
 

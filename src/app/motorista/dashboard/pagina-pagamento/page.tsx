@@ -53,8 +53,9 @@ export default function MinhaPaginaPagamentoPage() {
         setProfile(profileData);
 
         if (profileData) {
-          // Set payment URL
-          const formattedPhoneForUrl = profileData.celular.replace(/\D/g, '');
+          // Set payment URL - Remove non-digits and strip country code (55)
+          const digitsOnly = profileData.celular.replace(/\D/g, '');
+          const formattedPhoneForUrl = digitsOnly.startsWith('55') ? digitsOnly.substring(2) : digitsOnly;
           setPaymentUrl(`${window.location.origin}/${formattedPhoneForUrl}`);
 
           // Fetch QR code if Stripe account is connected (Task 2.6 - Initial Fetch)

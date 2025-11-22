@@ -411,7 +411,23 @@ function CheckoutForm({
           }
         })
 
-        // Just show the Pix code - driver will manually confirm payment later
+        // Create pending payment record (driver will confirm later in Lucro page)
+        const pendingPaymentRes = await fetch('/api/pix/create-pending-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            valor: amountInCents / 100, // Convert cents to BRL
+            motorista_id: profile.id,
+            pagador_info: null // Could add payer phone/email if collected
+          })
+        })
+
+        if (!pendingPaymentRes.ok) {
+          const errorData = await pendingPaymentRes.json()
+          throw new Error(errorData.error || 'Falha ao criar registro de pagamento')
+        }
+
+        // Show the Pix code - driver will manually confirm payment later
         setPixPayload(payload)
         setPixQrCode(qrCodeDataUrl)
         setShowPixCode(true)
