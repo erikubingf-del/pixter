@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { supabaseServer } from '@/lib/supabase/client'
 
 /**
  * Link Invoice by Receipt Number
@@ -41,8 +41,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Initialize Supabase client
-    const supabase = await createClient()
+    // Use Supabase server client
+    const supabase = supabaseServer
 
     // Find payment by receipt number
     const { data: payment, error: fetchError } = await supabase

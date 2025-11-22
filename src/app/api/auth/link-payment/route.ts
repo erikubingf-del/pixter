@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
+import { supabaseServer } from '@/lib/supabase/client'
 
 /**
  * Link Payment to User Account
@@ -31,8 +31,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Initialize Supabase client
-    const supabase = await createClient()
+    // Use Supabase server client
+    const supabase = supabaseServer
 
     // Find the payment by Stripe payment intent ID
     const { data: payment, error: fetchError } = await supabase
