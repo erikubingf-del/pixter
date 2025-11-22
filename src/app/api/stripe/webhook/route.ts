@@ -77,7 +77,7 @@ export async function POST(request: Request) {
 // --- Handler Functions ---
 
 async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
-  const { id, amount, metadata, currency, status, charges } = paymentIntent;
+  const { id, amount, metadata, currency, status, latest_charge } = paymentIntent;
   const driverId = metadata?.driverId;
   const applicationFee = metadata?.applicationFee ? parseInt(metadata.applicationFee) : 0;
 
@@ -88,10 +88,25 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
 
   try {
     // Get charge details for payment method and receipt
-    const charge = charges?.data?.[0];
-    const chargeId = charge?.id || null;
-    const paymentMethodType = charge?.payment_method_details?.type || null;
-    const receiptUrl = charge?.receipt_url || null;
+    // latest_charge can be a string ID or expanded Charge object
+    let chargeId: string | null = null;
+    let paymentMethodType: string | null = null;
+    let receiptUrl: string | null = null;
+
+    if (latest_charge) {
+      if (typeof latest_charge === 'string') {
+        // If it's just an ID, fetch the charge details
+        const charge = await stripe.charges.retrieve(latest_charge);
+        chargeId = charge.id;
+        paymentMethodType = charge.payment_method_details?.type || null;
+        receiptUrl = charge.receipt_url || null;
+      } else {
+        // If it's expanded, use it directly
+        chargeId = latest_charge.id;
+        paymentMethodType = latest_charge.payment_method_details?.type || null;
+        receiptUrl = latest_charge.receipt_url || null;
+      }
+    }
 
     // Calculate net amount (amount minus application fee)
     const netAmount = (amount - applicationFee) / 100; // Convert to BRL
