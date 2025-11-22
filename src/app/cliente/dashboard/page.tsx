@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
-import { Download, Plus, Trash2, Search } from 'lucide-react'
+import '../../../styles/amopagar-theme.css'
 
 interface Payment {
   id: string
@@ -14,21 +14,28 @@ interface Payment {
   receipt_number: string
   receipt_pdf_url: string | null
   receipt_url: string | null
+  is_business_expense: boolean
   motorista: {
     nome: string
   } | null
 }
 
-export default function ClienteDashboard() {
+interface Profile {
+  tipo: 'cliente' | 'motorista'
+  stripe_account_id: string | null
+  celular: string | null
+}
+
+export default function UnifiedDashboard() {
   const router = useRouter()
   const { data: session, status } = useSession()
 
   const [payments, setPayments] = useState<Payment[]>([])
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [searchTerm, setSearchTerm] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [showQRCode, setShowQRCode] = useState(false)
+  const [qrCodeUrl, setQrCodeUrl] = useState('')
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -37,39 +44,81 @@ export default function ClienteDashboard() {
     }
   }, [status, router])
 
-  // Fetch payments
+  // Fetch profile and payments
   useEffect(() => {
-    const fetchPayments = async () => {
+    const fetchData = async () => {
       if (status !== 'authenticated') return
 
       try {
         setLoading(true)
         setError('')
 
-        // Build query params
-        const params = new URLSearchParams()
-        if (startDate) params.append('startDate', startDate)
-        if (endDate) params.append('endDate', endDate)
-        if (searchTerm) params.append('search', searchTerm)
-
-        const res = await fetch(`/api/client/payments?${params.toString()}`)
-
-        if (!res.ok) {
-          throw new Error('Failed to fetch payments')
+        // Fetch profile
+        const profileRes = await fetch('/api/profile')
+        if (profileRes.ok) {
+          const profileData = await profileRes.json()
+          setProfile(profileData.profile)
         }
 
-        const data = await res.json()
-        setPayments(data.payments || [])
+        // Fetch recent payments
+        const paymentsRes = await fetch('/api/client/payments')
+        if (paymentsRes.ok) {
+          const paymentsData = await paymentsRes.json()
+          setPayments(paymentsData.payments?.slice(0, 5) || [])
+        }
       } catch (err: any) {
-        console.error('Error fetching payments:', err)
-        setError(err.message || 'Failed to load payments')
+        console.error('Error fetching data:', err)
+        setError(err.message || 'Failed to load data')
       } finally {
         setLoading(false)
       }
     }
 
-    fetchPayments()
-  }, [status, startDate, endDate, searchTerm])
+    fetchData()
+  }, [status])
+
+  // Generate QR Code
+  const generateQRCode = async () => {
+    if (!profile?.celular) return
+
+    try {
+      const QRCode = (await import('qrcode')).default
+      const paymentUrl = `${window.location.origin}/${profile.celular}`
+      const qrDataUrl = await QRCode.toDataURL(paymentUrl, {
+        width: 400,
+        margin: 2,
+        color: {
+          dark: '#1F2933',
+          light: '#FFFFFF'
+        }
+      })
+      setQrCodeUrl(qrDataUrl)
+      setShowQRCode(true)
+    } catch (err) {
+      console.error('Error generating QR code:', err)
+    }
+  }
+
+  // Toggle business expense
+  const toggleBusinessExpense = async (paymentId: string, currentValue: boolean) => {
+    try {
+      const res = await fetch(`/api/receipts/${paymentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_business_expense: !currentValue })
+      })
+
+      if (res.ok) {
+        setPayments(prev => prev.map(p =>
+          p.id === paymentId
+            ? { ...p, is_business_expense: !currentValue }
+            : p
+        ))
+      }
+    } catch (err) {
+      console.error('Error toggling business expense:', err)
+    }
+  }
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -83,257 +132,483 @@ export default function ClienteDashboard() {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR', {
       day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
+      month: 'short',
     })
   }
 
-  // Format payment method
-  const formatPaymentMethod = (method: string | null) => {
-    if (!method) return 'N/A'
-
-    const methodMap: Record<string, string> = {
-      'card': 'Cartão',
-      'pix': 'Pix',
-      'apple_pay': 'Apple Pay',
-      'google_pay': 'Google Pay',
-    }
-
-    return methodMap[method] || method
+  // Copy payment link
+  const copyPaymentLink = () => {
+    if (!profile?.celular) return
+    const link = `${window.location.origin}/${profile.celular}`
+    navigator.clipboard.writeText(link)
   }
-
-  // Download receipt
-  const downloadReceipt = async (receiptNumber: string) => {
-    try {
-      window.open(`/api/receipts/${receiptNumber}`, '_blank')
-    } catch (err) {
-      console.error('Error downloading receipt:', err)
-    }
-  }
-
-  // Calculate total spent
-  const totalSpent = payments.reduce((sum, p) => sum + p.valor, 0)
 
   if (status === 'loading' || loading) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin h-12 w-12 border-b-2 border-purple-600 rounded-full"></div>
+      <main style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #F0E7FC 0%, #E8F5E9 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{
+          width: '48px',
+          height: '48px',
+          border: '4px solid rgba(139, 125, 216, 0.2)',
+          borderTop: '4px solid #8B7DD8',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite'
+        }}></div>
+        <style jsx>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
       </main>
     )
   }
 
   if (!session) {
-    return null // Will redirect
+    return null
   }
 
+  const isDriver = profile?.tipo === 'motorista'
+  const isStripeConnected = isDriver && profile?.stripe_account_id
+
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
+    <main style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #F0E7FC 0%, #E8F5E9 100%)',
+      padding: '2rem 1rem'
+    }}>
+      <div className="amo-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900">
-            Olá, {session.user?.name || 'Cliente'}!
-          </h1>
-          <p className="text-gray-600 mt-2">Gerencie seus pagamentos e recibos</p>
-        </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-sm font-medium text-gray-600">Total Gasto</h3>
-            <p className="text-3xl font-bold text-gray-900 mt-2">
-              {formatCurrency(totalSpent)}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '2rem',
+          flexWrap: 'wrap',
+          gap: '1rem'
+        }}>
+          <div>
+            <h1 style={{
+              fontSize: '2rem',
+              fontWeight: '800',
+              color: '#1F2933',
+              marginBottom: '0.25rem'
+            }}>
+              👋 Olá, {session.user?.name?.split(' ')[0] || 'Cliente'}!
+            </h1>
+            <p style={{ color: '#52606D', fontSize: '0.95rem' }}>
+              {isDriver ? 'Gerencie pagamentos e receba vendas' : 'Acompanhe seus pagamentos'}
             </p>
           </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-sm font-medium text-gray-600">Pagamentos</h3>
-            <p className="text-3xl font-bold text-gray-900 mt-2">
-              {payments.length}
-            </p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-sm font-medium text-gray-600">Este Mês</h3>
-            <p className="text-3xl font-bold text-gray-900 mt-2">
-              {formatCurrency(
-                payments
-                  .filter(p => new Date(p.created_at).getMonth() === new Date().getMonth())
-                  .reduce((sum, p) => sum + p.valor, 0)
-              )}
-            </p>
-          </div>
+          <Link href="/settings" className="amo-btn amo-btn-outline">
+            ⚙️ Configurações
+          </Link>
         </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h2 className="text-xl font-bold mb-4">Filtros</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Search */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Buscar por vendedor
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Nome do vendedor..."
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-            </div>
-
-            {/* Start Date */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Data Inicial
-              </label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
-
-            {/* End Date */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Data Final
-              </label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
-          </div>
-
-          {/* Clear Filters */}
-          {(searchTerm || startDate || endDate) && (
-            <button
-              onClick={() => {
-                setSearchTerm('')
-                setStartDate('')
-                setEndDate('')
-              }}
-              className="mt-4 text-sm text-purple-600 hover:text-purple-800"
-            >
-              Limpar filtros
-            </button>
-          )}
-        </div>
-
-        {/* Payments Table */}
-        <section className="mb-12">
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-              <h2 className="text-xl font-bold">Seus Pagamentos</h2>
-              <Link
-                href="/cliente/dashboard/historico"
-                className="text-sm text-purple-600 hover:text-purple-800"
-              >
-                Ver todos
+        {/* Main Grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+          gap: '1.5rem'
+        }}>
+          {/* Payment History Card */}
+          <div className="amo-card amo-fade-in">
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem'
+            }}>
+              <h2 style={{
+                fontSize: '1.25rem',
+                fontWeight: '700',
+                color: '#1F2933'
+              }}>
+                💳 Últimos Pagamentos
+              </h2>
+              <Link href="/cliente/dashboard/historico" style={{
+                color: '#8B7DD8',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                textDecoration: 'none'
+              }}>
+                Ver todos →
               </Link>
             </div>
 
-            {error && (
-              <div className="px-6 py-4 bg-red-50 border-b border-red-200">
-                <p className="text-red-600 text-sm">{error}</p>
-              </div>
-            )}
-
             {payments.length === 0 ? (
-              <div className="px-6 py-12 text-center">
-                <p className="text-gray-500">Nenhum pagamento encontrado</p>
-                <Link
-                  href="/"
-                  className="mt-4 inline-block text-purple-600 hover:text-purple-800"
-                >
-                  Fazer um pagamento
-                </Link>
+              <div style={{
+                padding: '2rem 1rem',
+                textAlign: 'center',
+                color: '#9AA5B1'
+              }}>
+                <p>Nenhum pagamento ainda</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Data
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Valor
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Vendedor
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Método
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                        Recibo
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                        Ações
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {payments.map((payment) => (
-                      <tr key={payment.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatDate(payment.created_at)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {formatCurrency(payment.valor)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {payment.motorista?.nome || 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatPaymentMethod(payment.metodo)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          #{payment.receipt_number}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                          <button
-                            onClick={() => downloadReceipt(payment.receipt_number)}
-                            className="inline-flex items-center text-purple-600 hover:text-purple-900"
-                          >
-                            <Download className="w-4 h-4 mr-1" />
-                            Baixar
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {payments.map((payment) => (
+                  <div key={payment.id} style={{
+                    padding: '1rem',
+                    background: '#F9FAFB',
+                    borderRadius: 'var(--amo-radius-md)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      <p style={{
+                        fontWeight: '600',
+                        color: '#1F2933',
+                        marginBottom: '0.25rem'
+                      }}>
+                        {formatCurrency(payment.valor)}
+                      </p>
+                      <p style={{ fontSize: '0.875rem', color: '#52606D' }}>
+                        {payment.motorista?.nome || 'Vendedor'} • {formatDate(payment.created_at)}
+                      </p>
+                    </div>
+                    <span style={{ fontSize: '1.5rem' }}>
+                      {payment.metodo === 'pix' ? '📱' : '💳'}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
           </div>
-        </section>
 
-        {/* Manual Invoice Entry */}
-        <section className="mb-12">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-blue-900 mb-2">
-              Pagou sem estar logado?
-            </h3>
-            <p className="text-blue-700 mb-4">
-              Adicione manualmente o comprovante usando o número do recibo
-            </p>
-            <Link
-              href="/cliente/dashboard/add-invoice"
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Adicionar Comprovante
-            </Link>
+          {/* Receipts Card */}
+          <div className="amo-card amo-fade-in">
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem'
+            }}>
+              <h2 style={{
+                fontSize: '1.25rem',
+                fontWeight: '700',
+                color: '#1F2933'
+              }}>
+                📄 Meus Comprovantes
+              </h2>
+            </div>
+
+            {payments.length === 0 ? (
+              <div style={{
+                padding: '2rem 1rem',
+                textAlign: 'center',
+                color: '#9AA5B1'
+              }}>
+                <p>Sem comprovantes</p>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
+                  {payments.slice(0, 3).map((payment) => (
+                    <div key={payment.id} style={{
+                      padding: '1rem',
+                      background: '#F9FAFB',
+                      borderRadius: 'var(--amo-radius-md)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={payment.is_business_expense || false}
+                        onChange={() => toggleBusinessExpense(payment.id, payment.is_business_expense)}
+                        style={{
+                          width: '18px',
+                          height: '18px',
+                          accentColor: '#8B7DD8',
+                          cursor: 'pointer'
+                        }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <p style={{
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          color: '#1F2933'
+                        }}>
+                          {payment.receipt_number}
+                        </p>
+                        <p style={{ fontSize: '0.75rem', color: '#52606D' }}>
+                          {payment.is_business_expense ? '💼 Negócio' : '🏠 Pessoal'}
+                        </p>
+                      </div>
+                      <a
+                        href={`/api/receipts/${payment.receipt_number}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          padding: '0.5rem',
+                          color: '#8B7DD8',
+                          fontSize: '1.25rem',
+                          textDecoration: 'none'
+                        }}
+                      >
+                        ⬇️
+                      </a>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  className="amo-btn amo-btn-outline"
+                  style={{ width: '100%' }}
+                  onClick={() => router.push('/cliente/dashboard/historico')}
+                >
+                  📦 Exportar todos PDFs
+                </button>
+              </>
+            )}
           </div>
-        </section>
+
+          {/* Saved Cards Card */}
+          <div className="amo-card amo-fade-in">
+            <h2 style={{
+              fontSize: '1.25rem',
+              fontWeight: '700',
+              color: '#1F2933',
+              marginBottom: '1.5rem'
+            }}>
+              💾 Cartões Salvos
+            </h2>
+
+            <div style={{
+              padding: '2rem 1rem',
+              textAlign: 'center',
+              color: '#9AA5B1',
+              marginBottom: '1rem'
+            }}>
+              <p>Nenhum cartão salvo ainda</p>
+            </div>
+
+            <button
+              className="amo-btn amo-btn-outline"
+              style={{ width: '100%' }}
+            >
+              ➕ Adicionar cartão
+            </button>
+          </div>
+        </div>
+
+        {/* Driver-Specific Section */}
+        {isDriver && (
+          <div className="amo-fade-in" style={{ marginTop: '2rem' }}>
+            <div className="amo-card" style={{
+              background: 'linear-gradient(135deg, #E8F5E9 0%, #D4FC79 100%)',
+              border: `2px solid ${isStripeConnected ? '#81C995' : '#FCA5A5'}`
+            }}>
+              <h2 style={{
+                fontSize: '1.5rem',
+                fontWeight: '800',
+                color: '#1F2933',
+                marginBottom: '1.5rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                🚗 Recursos do Motorista
+              </h2>
+
+              {/* Payment Link Section */}
+              <div style={{
+                background: 'white',
+                borderRadius: 'var(--amo-radius-md)',
+                padding: '1.5rem',
+                marginBottom: '1.5rem'
+              }}>
+                <h3 style={{
+                  fontSize: '1.125rem',
+                  fontWeight: '700',
+                  color: '#1F2933',
+                  marginBottom: '1rem'
+                }}>
+                  🔗 Meu Link de Pagamento
+                </h3>
+
+                {isStripeConnected ? (
+                  <>
+                    <div style={{
+                      background: '#F9FAFB',
+                      padding: '1rem',
+                      borderRadius: 'var(--amo-radius-md)',
+                      marginBottom: '1rem',
+                      fontFamily: 'monospace',
+                      fontSize: '0.875rem',
+                      color: '#1F2933',
+                      wordBreak: 'break-all'
+                    }}>
+                      {window.location.origin}/{profile.celular}
+                    </div>
+
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: '0.75rem'
+                    }}>
+                      <button
+                        onClick={copyPaymentLink}
+                        className="amo-btn amo-btn-secondary"
+                      >
+                        📋 Copiar Link
+                      </button>
+                      <button
+                        onClick={generateQRCode}
+                        className="amo-btn amo-btn-secondary"
+                      >
+                        📱 Ver QR Code
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{
+                      background: '#FEE2E2',
+                      border: '2px solid #FCA5A5',
+                      borderRadius: 'var(--amo-radius-md)',
+                      padding: '1rem',
+                      marginBottom: '1rem',
+                      color: '#991B1B',
+                      fontSize: '0.875rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}>
+                      <span>🔒</span>
+                      <span>Conecte sua conta Stripe para ativar seu link de pagamento</span>
+                    </div>
+
+                    <Link
+                      href="/settings"
+                      className="amo-btn amo-btn-secondary"
+                      style={{ width: '100%' }}
+                    >
+                      Conectar Stripe Agora →
+                    </Link>
+                  </>
+                )}
+              </div>
+
+              {/* Stripe Alerts */}
+              <div style={{
+                background: 'white',
+                borderRadius: 'var(--amo-radius-md)',
+                padding: '1.5rem'
+              }}>
+                <h3 style={{
+                  fontSize: '1.125rem',
+                  fontWeight: '700',
+                  color: '#1F2933',
+                  marginBottom: '1rem'
+                }}>
+                  ⚠️ Alertas da Conta
+                </h3>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}>
+                    <span>{isStripeConnected ? '✅' : '⚠️'}</span>
+                    <span style={{ color: '#52606D' }}>
+                      {isStripeConnected ? 'Conta ativa e pronta' : 'Stripe não conectado'}
+                    </span>
+                  </div>
+
+                  {isStripeConnected && (
+                    <Link
+                      href="/settings"
+                      style={{
+                        color: '#8B7DD8',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        textDecoration: 'none'
+                      }}
+                    >
+                      Gerenciar Conta Stripe →
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* QR Code Modal */}
+        {showQRCode && (
+          <div
+            onClick={() => setShowQRCode(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.8)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '2rem'
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'white',
+                borderRadius: 'var(--amo-radius-lg)',
+                padding: '2rem',
+                maxWidth: '500px',
+                width: '100%',
+                textAlign: 'center'
+              }}
+            >
+              <h3 style={{
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                marginBottom: '1rem',
+                color: '#1F2933'
+              }}>
+                📱 Mostre este QR Code
+              </h3>
+              <p style={{
+                color: '#52606D',
+                marginBottom: '1.5rem',
+                fontSize: '0.875rem'
+              }}>
+                O cliente pode escanear para fazer o pagamento
+              </p>
+              {qrCodeUrl && (
+                <img
+                  src={qrCodeUrl}
+                  alt="QR Code de Pagamento"
+                  style={{
+                    width: '100%',
+                    maxWidth: '400px',
+                    height: 'auto',
+                    marginBottom: '1.5rem'
+                  }}
+                />
+              )}
+              <button
+                onClick={() => setShowQRCode(false)}
+                className="amo-btn amo-btn-secondary"
+                style={{ width: '100%' }}
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   )
