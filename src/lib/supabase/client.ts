@@ -10,34 +10,18 @@
    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
    /*──────────────── CLIENTES ────────────────────────────*/
-   // Lazy-loaded server client to avoid build-time errors when env vars aren't available
-   // Only create the client when actually accessed (not during module evaluation)
-   class SupabaseServerClient {
-     private static instance: ReturnType<typeof createClient> | null = null;
-
-     static get client() {
-       if (this.instance) {
-         return this.instance;
+   // Server-side instance (uses service key, ONLY for backend/API routes)
+   // Use empty string fallbacks to avoid build-time errors - will fail at runtime if actually used without env vars
+   export const supabaseServer = createClient(
+     supabaseUrl || '',
+     supabaseServiceKey || '',
+     {
+       auth: {
+         persistSession: false,
+         autoRefreshToken: false,
        }
-
-       if (!supabaseUrl || !supabaseServiceKey) {
-         throw new Error('Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
-       }
-
-       this.instance = createClient(supabaseUrl, supabaseServiceKey);
-       return this.instance;
      }
-   }
-
-   // Export via getter that's only evaluated when used
-   export const supabaseServer = new Proxy({} as ReturnType<typeof createClient>, {
-     get: (_target, prop) => {
-       const client = SupabaseServerClient.client;
-       const value = (client as any)[prop];
-       // Bind methods to preserve 'this' context
-       return typeof value === 'function' ? value.bind(client) : value;
-     }
-   });
+   );
 
    export const supabaseAdmin = supabaseServer;  // alias for Admin API
    
