@@ -18,6 +18,7 @@ interface Profile {
   avatar_url: string | null
   company_name: string | null
   address: string | null
+  city: string | null
 }
 
 export default function SettingsPage() {
@@ -34,6 +35,7 @@ export default function SettingsPage() {
     nome: '',
     company_name: '',
     address: '',
+    city: '',
     pix_key: '',
   })
 
@@ -60,6 +62,7 @@ export default function SettingsPage() {
             nome: data.profile.nome || '',
             company_name: data.profile.company_name || '',
             address: data.profile.address || '',
+            city: data.profile.city || '',
             pix_key: data.profile.pix_key || '',
           })
         }
@@ -368,6 +371,34 @@ export default function SettingsPage() {
             </div>
 
             <div>
+              <label htmlFor="city" style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: '#1F2933',
+                marginBottom: '0.5rem'
+              }}>
+                Cidade
+              </label>
+              <input
+                id="city"
+                name="city"
+                type="text"
+                value={formData.city}
+                onChange={handleChange}
+                className="amo-input"
+                placeholder="Ex: São Paulo"
+              />
+              <p style={{
+                fontSize: '0.75rem',
+                color: '#9AA5B1',
+                marginTop: '0.25rem'
+              }}>
+                Usado para pagamentos Pix
+              </p>
+            </div>
+
+            <div>
               <label htmlFor="address" style={{
                 display: 'block',
                 fontSize: '0.875rem',
@@ -375,7 +406,7 @@ export default function SettingsPage() {
                 color: '#1F2933',
                 marginBottom: '0.5rem'
               }}>
-                Endereço
+                Endereço completo
               </label>
               <textarea
                 id="address"

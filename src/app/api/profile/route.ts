@@ -17,7 +17,7 @@ export async function GET() {
     // Fetch profile from database
     const { data: profile, error } = await supabaseServer
       .from('profiles')
-      .select('id, nome, email, celular, cpf, tipo, stripe_account_id, pix_key, avatar_url, company_name, address')
+      .select('id, nome, email, celular, cpf, tipo, stripe_account_id, pix_key, avatar_url, company_name, city, address')
       .eq('email', session.user.email)
       .single()
 
@@ -51,7 +51,7 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json()
-    const { nome, company_name, address, avatar_url, pix_key } = body
+    const { nome, company_name, city, address, avatar_url, pix_key } = body
 
     // Update profile
     const { data: profile, error } = await supabaseServer
@@ -59,6 +59,7 @@ export async function PATCH(request: Request) {
       .update({
         nome,
         company_name,
+        city,
         address,
         avatar_url,
         pix_key,

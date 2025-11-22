@@ -22,7 +22,7 @@ export async function GET(
     // fetch exactly what we need (including stripe_account_id and pix_key for payment methods)
     const { data: prof, error } = await supabaseServer
       .from("profiles")
-      .select("id, nome, profissao, avatar_url, stripe_account_id, pix_key, celular, cpf, company_name, tipo")
+      .select("id, nome, profissao, avatar_url, stripe_account_id, pix_key, celular, cpf, company_name, city, tipo")
       .eq("celular", e164)
       .eq("tipo", "motorista")
       .maybeSingle();
@@ -57,6 +57,7 @@ export async function GET(
       celular: prof.celular,
       cpf: prof.cpf,
       company_name: prof.company_name,
+      city: prof.city,
       pix_key: prof.pix_key,
       stripe_account_id: prof.stripe_account_id,
     };

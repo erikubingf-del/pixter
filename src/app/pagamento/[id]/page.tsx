@@ -27,6 +27,7 @@ type Profile = {
   celular?: string
   cpf?: string
   company_name?: string
+  city?: string
   pix_key?: string
   stripe_account_id?: string
 }
@@ -334,6 +335,8 @@ function CheckoutForm({
 
   // Pix-specific state
   const [pixPayload, setPixPayload] = useState<string | null>(null)
+  const [pixQrCode, setPixQrCode] = useState<string | null>(null)
+  const [pixReceiptNumber, setPixReceiptNumber] = useState<string | null>(null)
   const [showPixCode, setShowPixCode] = useState(false)
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -382,16 +385,54 @@ function CheckoutForm({
       if (paymentMethod === 'pix') {
         // Generate Pix payload
         const { generatePixPayload } = await import('@/lib/pix/generator')
+        const QRCode = (await import('qrcode')).default
+
+        // Use driver's city or default to SAO PAULO
+        const merchantCity = (profile.city || 'SAO PAULO')
+          .toUpperCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '') // Remove accents
+          .substring(0, 15) // Max 15 chars for BR Code
 
         const payload = generatePixPayload({
           pixKey: profile.pix_key!,
           merchantName: profile.nome || 'Motorista',
-          merchantCity: 'SAO PAULO', // TODO: Get from profile or use default
+          merchantCity,
           amount: amountInCents / 100, // Convert cents to BRL
           description: profile.company_name || undefined,
         })
 
+        // Generate QR code as data URL
+        const qrCodeDataUrl = await QRCode.toDataURL(payload, {
+          width: 300,
+          margin: 2,
+          color: {
+            dark: '#1F2933',
+            light: '#FFFFFF'
+          }
+        })
+
+        // Create payment record in database
+        const paymentRes = await fetch('/api/pix/create-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            motorista_id: profile.id,
+            valor: amountInCents / 100,
+            pix_payload: payload
+          })
+        })
+
+        if (!paymentRes.ok) {
+          const errorData = await paymentRes.json()
+          throw new Error(errorData.error || 'Failed to create Pix payment')
+        }
+
+        const paymentData = await paymentRes.json()
+
         setPixPayload(payload)
+        setPixQrCode(qrCodeDataUrl)
+        setPixReceiptNumber(paymentData.receiptNumber)
         setShowPixCode(true)
         setSubmitting(false)
       } else {
@@ -458,33 +499,48 @@ function CheckoutForm({
             fontSize: '1.5rem',
             fontWeight: '700',
             color: '#81C995',
-            marginBottom: '1rem'
+            marginBottom: '0.5rem'
           }}>
             {formatAmount(amount)}
           </p>
+          {pixReceiptNumber && (
+            <p style={{
+              fontSize: '0.875rem',
+              color: '#52606D',
+              fontFamily: 'monospace'
+            }}>
+              Recibo: {pixReceiptNumber}
+            </p>
+          )}
         </div>
 
-        {/* TODO: Add QR Code here */}
-        <div style={{
-          background: '#F9FAFB',
-          borderRadius: 'var(--amo-radius-md)',
-          padding: '1.5rem',
-          textAlign: 'center'
-        }}>
-          <p style={{
-            fontSize: '0.875rem',
-            color: '#52606D',
-            marginBottom: '1rem'
+        {/* QR Code */}
+        {pixQrCode && (
+          <div style={{
+            background: 'white',
+            borderRadius: 'var(--amo-radius-md)',
+            padding: '1.5rem',
+            textAlign: 'center',
+            border: '2px solid #E4E7EB'
           }}>
-            QR Code será exibido aqui
-          </p>
-          <p style={{
-            fontSize: '0.75rem',
-            color: '#9AA5B1'
-          }}>
-            (Implementação do QR code pendente)
-          </p>
-        </div>
+            <img
+              src={pixQrCode}
+              alt="QR Code Pix"
+              style={{
+                maxWidth: '100%',
+                height: 'auto',
+                borderRadius: 'var(--amo-radius-sm)'
+              }}
+            />
+            <p style={{
+              fontSize: '0.875rem',
+              color: '#52606D',
+              marginTop: '1rem'
+            }}>
+              Escaneie o QR Code com seu app do banco
+            </p>
+          </div>
+        )}
 
         {/* Copia e Cola */}
         <div>
@@ -513,6 +569,35 @@ function CheckoutForm({
           </div>
         </div>
 
+        {/* Payment Instructions */}
+        <div style={{
+          background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+          borderRadius: 'var(--amo-radius-md)',
+          padding: '1.5rem',
+          border: '2px solid #93C5FD'
+        }}>
+          <h4 style={{
+            fontSize: '1rem',
+            fontWeight: '700',
+            color: '#1E40AF',
+            marginBottom: '0.75rem'
+          }}>
+            📝 Como pagar:
+          </h4>
+          <ol style={{
+            fontSize: '0.875rem',
+            color: '#1E40AF',
+            paddingLeft: '1.25rem',
+            margin: 0,
+            lineHeight: '1.6'
+          }}>
+            <li>Abra o app do seu banco</li>
+            <li>Escaneie o QR Code ou copie o código</li>
+            <li>Confirme o pagamento de {formatAmount(amount)}</li>
+            <li>O recebedor será notificado automaticamente</li>
+          </ol>
+        </div>
+
         <button
           type="button"
           onClick={handleCopyPix}
@@ -527,6 +612,8 @@ function CheckoutForm({
           onClick={() => {
             setShowPixCode(false)
             setPixPayload(null)
+            setPixQrCode(null)
+            setPixReceiptNumber(null)
           }}
           className="amo-btn amo-btn-outline"
           style={{ width: '100%' }}
