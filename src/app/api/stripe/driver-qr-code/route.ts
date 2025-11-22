@@ -3,6 +3,8 @@ import { NextResponse, NextRequest } from "next/server";
 import QRCode from "qrcode";
 import { supabaseServer } from "@/lib/supabase/client";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);

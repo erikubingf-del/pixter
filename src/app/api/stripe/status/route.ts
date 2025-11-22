@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { supabaseServer } from '@/lib/supabase/client'
 import Stripe from 'stripe'
 
+export const dynamic = 'force-dynamic';
+
 const stripe = process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY, {
       apiVersion: '2022-11-15',
