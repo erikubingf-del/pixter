@@ -11,18 +11,31 @@
 
    /*──────────────── CLIENTES ────────────────────────────*/
    // Lazy-loaded server client to avoid build-time errors when env vars aren't available
-   function getSupabaseServer() {
-     if (!supabaseUrl || !supabaseServiceKey) {
-       throw new Error('Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+   // Only create the client when actually accessed (not during module evaluation)
+   class SupabaseServerClient {
+     private static instance: ReturnType<typeof createClient> | null = null;
+
+     static get client() {
+       if (this.instance) {
+         return this.instance;
+       }
+
+       if (!supabaseUrl || !supabaseServiceKey) {
+         throw new Error('Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+       }
+
+       this.instance = createClient(supabaseUrl, supabaseServiceKey);
+       return this.instance;
      }
-     return createClient(supabaseUrl, supabaseServiceKey);
    }
 
-   // Export as getter to ensure lazy evaluation
+   // Export via getter that's only evaluated when used
    export const supabaseServer = new Proxy({} as ReturnType<typeof createClient>, {
-     get: (target, prop) => {
-       const client = getSupabaseServer();
-       return (client as any)[prop];
+     get: (_target, prop) => {
+       const client = SupabaseServerClient.client;
+       const value = (client as any)[prop];
+       // Bind methods to preserve 'this' context
+       return typeof value === 'function' ? value.bind(client) : value;
      }
    });
 
