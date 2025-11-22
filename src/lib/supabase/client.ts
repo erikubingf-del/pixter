@@ -11,17 +11,20 @@
 
    /*──────────────── CLIENTES ────────────────────────────*/
    // Server-side instance (uses service key, ONLY for backend/API routes)
-   // Use empty string fallbacks to avoid build-time errors - will fail at runtime if actually used without env vars
-   export const supabaseServer = createClient(
-     supabaseUrl || '',
-     supabaseServiceKey || '',
-     {
-       auth: {
-         persistSession: false,
-         autoRefreshToken: false,
-       }
-     }
-   );
+   // Conditionally create client to avoid build-time errors when env vars unavailable
+   export const supabaseServer = (supabaseUrl && supabaseServiceKey)
+     ? createClient(supabaseUrl, supabaseServiceKey, {
+         auth: {
+           persistSession: false,
+           autoRefreshToken: false,
+         }
+       })
+     : createClient('https://placeholder.supabase.co', 'placeholder-key', {
+         auth: {
+           persistSession: false,
+           autoRefreshToken: false,
+         }
+       });
 
    export const supabaseAdmin = supabaseServer;  // alias for Admin API
    
