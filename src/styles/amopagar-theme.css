@@ -1,0 +1,330 @@
+/* AmoPagar Design System */
+
+:root {
+  /* Brand Colors */
+  --amo-purple: #8B7DD8;
+  --amo-purple-light: #A094E0;
+  --amo-purple-dark: #6B5DB8;
+  --amo-green: #81C995;
+  --amo-green-light: #9DD9AC;
+  --amo-green-dark: #61A975;
+
+  /* Neutrals */
+  --amo-white: #FFFFFF;
+  --amo-off-white: #F9FAFB;
+  --amo-gray-50: #F5F7FA;
+  --amo-gray-100: #E4E7EB;
+  --amo-gray-200: #CBD2D9;
+  --amo-gray-300: #9AA5B1;
+  --amo-gray-400: #7B8794;
+  --amo-gray-500: #616E7C;
+  --amo-gray-600: #52606D;
+  --amo-gray-700: #3E4C59;
+  --amo-gray-800: #323F4B;
+  --amo-gray-900: #1F2933;
+
+  /* Gradients */
+  --amo-gradient-purple: linear-gradient(135deg, #E0C3FC 0%, #8B7DD8 100%);
+  --amo-gradient-green: linear-gradient(135deg, #D4FC79 0%, #81C995 100%);
+  --amo-gradient-bg: linear-gradient(135deg, #E0C3FC 0%, #8EC5FC 50%, #D4FC79 100%);
+
+  /* Shadows */
+  --amo-shadow-sm: 0 1px 3px rgba(139, 125, 216, 0.08);
+  --amo-shadow-md: 0 4px 6px rgba(139, 125, 216, 0.12);
+  --amo-shadow-lg: 0 10px 25px rgba(139, 125, 216, 0.15);
+  --amo-shadow-xl: 0 20px 40px rgba(139, 125, 216, 0.2);
+
+  /* Border Radius */
+  --amo-radius-sm: 8px;
+  --amo-radius-md: 16px;
+  --amo-radius-lg: 24px;
+  --amo-radius-xl: 32px;
+  --amo-radius-full: 9999px;
+
+  /* Typography */
+  --amo-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --amo-font-size-xs: 0.75rem;
+  --amo-font-size-sm: 0.875rem;
+  --amo-font-size-base: 1rem;
+  --amo-font-size-lg: 1.125rem;
+  --amo-font-size-xl: 1.25rem;
+  --amo-font-size-2xl: 1.5rem;
+  --amo-font-size-3xl: 1.875rem;
+  --amo-font-size-4xl: 2.25rem;
+  --amo-font-size-5xl: 3rem;
+
+  /* Spacing */
+  --amo-space-1: 0.25rem;
+  --amo-space-2: 0.5rem;
+  --amo-space-3: 0.75rem;
+  --amo-space-4: 1rem;
+  --amo-space-6: 1.5rem;
+  --amo-space-8: 2rem;
+  --amo-space-12: 3rem;
+  --amo-space-16: 4rem;
+  --amo-space-24: 6rem;
+}
+
+/* Base Styles */
+body {
+  font-family: var(--amo-font-family);
+  color: var(--amo-gray-900);
+  background: var(--amo-off-white);
+  line-height: 1.6;
+}
+
+/* Buttons */
+.amo-btn {
+  padding: 0.75rem 2rem;
+  border-radius: var(--amo-radius-full);
+  font-weight: 600;
+  font-size: var(--amo-font-size-base);
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow: var(--amo-shadow-sm);
+}
+
+.amo-btn-primary {
+  background: var(--amo-purple);
+  color: white;
+}
+
+.amo-btn-primary:hover {
+  background: var(--amo-purple-dark);
+  box-shadow: var(--amo-shadow-md);
+  transform: translateY(-2px);
+}
+
+.amo-btn-secondary {
+  background: var(--amo-green);
+  color: white;
+}
+
+.amo-btn-secondary:hover {
+  background: var(--amo-green-dark);
+  box-shadow: var(--amo-shadow-md);
+  transform: translateY(-2px);
+}
+
+.amo-btn-outline {
+  background: transparent;
+  color: var(--amo-purple);
+  border: 2px solid var(--amo-purple);
+}
+
+.amo-btn-outline:hover {
+  background: var(--amo-purple);
+  color: white;
+}
+
+.amo-btn-ghost {
+  background: transparent;
+  color: var(--amo-gray-700);
+  box-shadow: none;
+}
+
+.amo-btn-ghost:hover {
+  background: var(--amo-gray-100);
+}
+
+/* Input Fields */
+.amo-input {
+  padding: 1rem 1.5rem;
+  border-radius: var(--amo-radius-full);
+  border: 2px solid var(--amo-gray-200);
+  font-size: var(--amo-font-size-base);
+  width: 100%;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.amo-input:focus {
+  outline: none;
+  border-color: var(--amo-purple);
+  box-shadow: 0 0 0 3px rgba(139, 125, 216, 0.1);
+}
+
+.amo-input::placeholder {
+  color: var(--amo-gray-400);
+}
+
+/* Cards */
+.amo-card {
+  background: white;
+  border-radius: var(--amo-radius-lg);
+  padding: var(--amo-space-8);
+  box-shadow: var(--amo-shadow-md);
+  transition: all 0.3s ease;
+}
+
+.amo-card:hover {
+  box-shadow: var(--amo-shadow-lg);
+  transform: translateY(-4px);
+}
+
+.amo-card-pricing {
+  background: white;
+  border-radius: var(--amo-radius-xl);
+  padding: var(--amo-space-8);
+  box-shadow: var(--amo-shadow-md);
+  text-align: center;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.amo-card-pricing:hover {
+  border-color: var(--amo-green);
+  box-shadow: var(--amo-shadow-xl);
+  transform: scale(1.05);
+}
+
+/* Progress Steps */
+.amo-steps {
+  display: flex;
+  gap: var(--amo-space-2);
+  margin-bottom: var(--amo-space-8);
+}
+
+.amo-step {
+  flex: 1;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--amo-radius-full);
+  background: var(--amo-gray-200);
+  color: var(--amo-gray-600);
+  font-weight: 600;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.amo-step.active {
+  background: var(--amo-purple);
+  color: white;
+  box-shadow: var(--amo-shadow-md);
+}
+
+.amo-step.completed {
+  background: var(--amo-green);
+  color: white;
+}
+
+/* Hero Section */
+.amo-hero {
+  background: var(--amo-gradient-bg);
+  padding: var(--amo-space-24) var(--amo-space-8);
+  border-radius: 0 0 var(--amo-radius-xl) var(--amo-radius-xl);
+  position: relative;
+  overflow: hidden;
+}
+
+.amo-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -10%;
+  width: 40%;
+  height: 150%;
+  background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
+  border-radius: 50%;
+}
+
+/* Feature Icons */
+.amo-feature-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--amo-radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--amo-gradient-purple);
+  margin: 0 auto var(--amo-space-4);
+  box-shadow: var(--amo-shadow-md);
+}
+
+/* Testimonial */
+.amo-testimonial {
+  background: white;
+  padding: var(--amo-space-8);
+  border-radius: var(--amo-radius-xl);
+  box-shadow: var(--amo-shadow-lg);
+  position: relative;
+}
+
+.amo-testimonial::before {
+  content: '"';
+  font-size: 6rem;
+  color: var(--amo-purple);
+  opacity: 0.2;
+  position: absolute;
+  top: -2rem;
+  left: 1rem;
+  font-family: Georgia, serif;
+}
+
+/* Navigation */
+.amo-nav {
+  background: white;
+  padding: var(--amo-space-4) var(--amo-space-8);
+  box-shadow: var(--amo-shadow-sm);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+/* Utility Classes */
+.amo-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--amo-space-4);
+}
+
+.amo-text-center {
+  text-align: center;
+}
+
+.amo-text-gradient {
+  background: var(--amo-gradient-purple);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.amo-mb-4 { margin-bottom: var(--amo-space-4); }
+.amo-mb-8 { margin-bottom: var(--amo-space-8); }
+.amo-mt-4 { margin-top: var(--amo-space-4); }
+.amo-mt-8 { margin-top: var(--amo-space-8); }
+
+/* Animations */
+@keyframes amo-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.amo-fade-in {
+  animation: amo-fade-in 0.6s ease-out;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .amo-hero {
+    padding: var(--amo-space-12) var(--amo-space-4);
+  }
+
+  .amo-steps {
+    flex-direction: column;
+  }
+
+  .amo-card {
+    padding: var(--amo-space-6);
+  }
+}

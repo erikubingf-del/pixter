@@ -2,145 +2,379 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
+import '../styles/amopagar-theme.css'
 
 export default function Home() {
   return (
-    <main className="min-h-screen">
-      {/* Header Removed - Handled by Root Layout NavBar */}
-      {/* 
-      <header className="bg-white py-4 shadow-sm">
-        <div className="container mx-auto px-4 flex justify-between items-center">
-          <div className="flex items-center">
-            <Link href="/" className="text-2xl font-bold text-black flex items-center">
-              <div className="w-10 h-10 bg-purple-700 rounded-md flex items-center justify-center mr-2">
-                <span className="text-white font-bold">P</span>
-              </div>
-              Pixter
-            </Link>
-          </div>
-          <nav className="hidden md:flex items-center space-x-6">
-            <Link href="/login" className="text-gray-700 hover:text-purple-700">Acessar Conta</Link>
-            <Link href="/motorista/login" className="text-gray-700 hover:text-purple-700">Acessar Motoristas/Vendedores</Link>
-          </nav>
-        </div>
-      </header>
-      */}
+    <main className="min-h-screen" style={{ background: 'linear-gradient(135deg, #F0E7FC 0%, #E8F5E9 100%)' }}>
 
       {/* Hero Section */}
-      <section className="py-16 md:py-24 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center">
-            <div className="md:w-1/2 mb-10 md:mb-0">
-              <h1 className="text-4xl md:text-5xl font-bold mb-6">
-                Receba Pagamentos em QR Code, Sem Maquininha.
+      <section className="amo-hero">
+        <div className="amo-container">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '4rem', alignItems: 'center' }}>
+
+            {/* Hero Content */}
+            <div className="amo-fade-in">
+              <h1 style={{
+                fontSize: 'clamp(2rem, 5vw, 3.5rem)',
+                fontWeight: '800',
+                marginBottom: '1.5rem',
+                lineHeight: '1.2',
+                color: '#1F2933'
+              }}>
+                Payments that feel good. Simple, fast, and friendly.
               </h1>
-              <p className="text-lg text-gray-700 mb-8">
+
+              <p style={{
+                fontSize: '1.25rem',
+                color: '#52606D',
+                marginBottom: '2rem',
+                lineHeight: '1.8'
+              }}>
                 Com o AmoPagar, motoristas, feirantes e vendedores aceitam Pix, Cartão de Crédito e Apple Pay direto pelo celular. Rápido, seguro e sem mensalidade.
               </p>
-              <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-                <Link 
-                  href="/motorista/cadastro" 
-                  className="bg-purple-600 text-white py-3 px-6 rounded-md font-medium hover:bg-purple-700 transition text-center"
-                >
-                  Criar Conta Gratuita
+
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <Link href="/motorista/cadastro" className="amo-btn amo-btn-primary">
+                  Get Started
                 </Link>
+                <button className="amo-btn amo-btn-outline">
+                  How it works
+                </button>
               </div>
             </div>
-            <div className="md:w-1/2 flex justify-center">
-              <div className="relative w-full max-w-md">
+
+            {/* Hero Image */}
+            <div className="amo-fade-in" style={{ position: 'relative', animationDelay: '0.2s' }}>
+              <div style={{
+                background: 'white',
+                borderRadius: 'var(--amo-radius-xl)',
+                padding: '2rem',
+                boxShadow: 'var(--amo-shadow-xl)',
+                position: 'relative',
+                transform: 'rotate(-2deg)',
+                transition: 'transform 0.3s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'rotate(0deg) scale(1.02)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'rotate(-2deg)'}
+              >
                 <Image
                   src="/images/homepage/driver.png"
-                  alt="Motorista usando AmoPagar"
+                  alt="Happy couple using AmoPagar"
                   width={500}
                   height={400}
                   unoptimized
-                  className="w-full h-auto rounded-lg"
+                  style={{ width: '100%', height: 'auto', borderRadius: 'var(--amo-radius-md)' }}
                 />
+
+                {/* Floating Success Badge */}
+                <div style={{
+                  position: 'absolute',
+                  top: '-1rem',
+                  right: '-1rem',
+                  background: 'var(--amo-green)',
+                  color: 'white',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: 'var(--amo-radius-full)',
+                  fontWeight: '600',
+                  boxShadow: 'var(--amo-shadow-lg)',
+                  fontSize: '0.875rem'
+                }}>
+                  ✓ Payment Sent
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* How It Works Section */}
-      <section className="py-16 bg-white">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-16">Como Funciona</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="flex flex-col items-center text-center">
-              <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Crie sua conta AmoPagar</h3>
-              <p className="text-gray-600">Cadastro rápido e gratuito</p>
-            </div>
-            
-            <div className="flex flex-col items-center text-center">
-              <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Compartilhe seu QR Code</h3>
-              <p className="text-gray-600">Seu cliente escaneia, digita o valor e já paga via Pix, Cartão ou Apple Pay</p>
-            </div>
-            
-            <div className="flex flex-col items-center text-center">
-              <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Receba automaticamente</h3>
-              <p className="text-gray-600">O valor cai direto na sua conta bancária, conectado ao Stripe com taxa reduzida de apenas 4%</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Target Audience Section */}
-      <section className="py-16 bg-white">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold mb-8">Feito para quem vende na rua, na feira, ou dirige pelas cidades.</h2>
-          <p className="text-lg text-gray-700 max-w-3xl mx-auto mb-10">
-            AmoPagar é a solução ideal para motoristas de táxi, vendedores de feira, ambulantes e pequenos negócios que precisam aceitar pagamentos de forma moderna, sem complicação, e sem precisar investir em maquininhas.
+      {/* Features Section */}
+      <section style={{ padding: '6rem 2rem', background: 'white' }}>
+        <div className="amo-container">
+          <h2 className="amo-text-center" style={{ fontSize: '2.5rem', fontWeight: '700', marginBottom: '1rem' }}>
+            Features
+          </h2>
+          <p className="amo-text-center" style={{ color: '#52606D', marginBottom: '4rem', fontSize: '1.125rem' }}>
+            Everything you need to accept payments anywhere
           </p>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '2rem'
+          }}>
+
+            {/* Feature 1 */}
+            <div className="amo-card" style={{ textAlign: 'center' }}>
+              <div style={{
+                width: '80px',
+                height: '80px',
+                background: 'linear-gradient(135deg, #E0C3FC 0%, #8B7DD8 100%)',
+                borderRadius: 'var(--amo-radius-lg)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 1.5rem',
+                fontSize: '2.5rem'
+              }}>
+                📱
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.75rem' }}>
+                Instant Pix
+              </h3>
+              <p style={{ color: '#52606D' }}>
+                Playful, custom illustrations to make Instant Pix.
+              </p>
+            </div>
+
+            {/* Feature 2 */}
+            <div className="amo-card" style={{ textAlign: 'center' }}>
+              <div style={{
+                width: '80px',
+                height: '80px',
+                background: 'linear-gradient(135deg, #81C995 0%, #61A975 100%)',
+                borderRadius: 'var(--amo-radius-lg)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 1.5rem',
+                fontSize: '2.5rem'
+              }}>
+                🔒
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.75rem' }}>
+                Safe & Secure
+              </h3>
+              <p style={{ color: '#52606D' }}>
+                Provide custom illustrations to secure safely.
+              </p>
+            </div>
+
+            {/* Feature 3 */}
+            <div className="amo-card" style={{ textAlign: 'center' }}>
+              <div style={{
+                width: '80px',
+                height: '80px',
+                background: 'linear-gradient(135deg, #FFD93D 0%, #FFA93D 100%)',
+                borderRadius: 'var(--amo-radius-lg)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 1.5rem',
+                fontSize: '2.5rem'
+              }}>
+                🤝
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.75rem' }}>
+                Trusted Vendors
+              </h3>
+              <p style={{ color: '#52606D' }}>
+                Improve custom trusted by trusted vendors.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Security Section */}
-      <section className="py-16 bg-white">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold mb-6">Segurança de nível Stripe</h2>
-          <p className="text-lg text-gray-700 max-w-3xl mx-auto mb-10">
-            Todos os pagamentos pelo AmoPagar são processados com a tecnologia da Stripe, líder global em pagamentos online. Proteção total dos dados e criptografia de ponta a ponta.
+      {/* Pricing Section */}
+      <section style={{ padding: '6rem 2rem', background: 'linear-gradient(135deg, #F0E7FC 0%, #E8F5E9 100%)' }}>
+        <div className="amo-container">
+          <h2 className="amo-text-center" style={{ fontSize: '2.5rem', fontWeight: '700', marginBottom: '1rem' }}>
+            Pricing
+          </h2>
+          <p className="amo-text-center" style={{ color: '#52606D', marginBottom: '4rem', fontSize: '1.125rem' }}>
+            Simple, transparent pricing for everyone
           </p>
-          
-          <div className="flex justify-center items-center space-x-8 mt-8">
-            <Image src="images/logos/stripe.png" alt="Stripe" width={80} height={30} unoptimized />
-            <Image src="images/logos/pix.png" alt="Pix" width={60} height={30} unoptimized />
-            <Image src="images/logos/apple-pay.png" alt="Apple Pay" width={60} height={30} unoptimized />
-            <Image src="images/logos/visa.png" alt="Visa" width={60} height={30} unoptimized />
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: '2rem',
+            maxWidth: '800px',
+            margin: '0 auto'
+          }}>
+
+            {/* Free Plan */}
+            <div className="amo-card-pricing">
+              <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1rem', color: '#8B7DD8' }}>
+                Driver
+              </h3>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <span style={{ fontSize: '3rem', fontWeight: '800', color: '#1F2933' }}>R$60</span>
+                <span style={{ color: '#52606D' }}>/month</span>
+              </div>
+              <p style={{ color: '#52606D', marginBottom: '2rem' }}>
+                Prouide your account and priomatiae payment.
+              </p>
+              <button className="amo-btn amo-btn-secondary" style={{ width: '100%' }}>
+                Buy now
+              </button>
+              <ul style={{
+                listStyle: 'none',
+                padding: 0,
+                marginTop: '2rem',
+                textAlign: 'left'
+              }}>
+                <li style={{ padding: '0.5rem 0', color: '#52606D' }}>✓ Accept Pix payments</li>
+                <li style={{ padding: '0.5rem 0', color: '#52606D' }}>✓ Credit card payments</li>
+                <li style={{ padding: '0.5rem 0', color: '#52606D' }}>✓ Basic dashboard</li>
+              </ul>
+            </div>
+
+            {/* Pro Plan */}
+            <div className="amo-card-pricing" style={{
+              border: '3px solid var(--amo-purple)',
+              transform: 'scale(1.05)',
+              position: 'relative'
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: '-1rem',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: 'var(--amo-purple)',
+                color: 'white',
+                padding: '0.5rem 1.5rem',
+                borderRadius: 'var(--amo-radius-full)',
+                fontSize: '0.875rem',
+                fontWeight: '600'
+              }}>
+                MOST POPULAR
+              </div>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1rem', color: '#8B7DD8' }}>
+                Business
+              </h3>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <span style={{ fontSize: '3rem', fontWeight: '800', color: '#1F2933' }}>R$135</span>
+                <span style={{ color: '#52606D' }}>/month</span>
+              </div>
+              <p style={{ color: '#52606D', marginBottom: '2rem' }}>
+                Prouide delear cards for existing payments.
+              </p>
+              <button className="amo-btn amo-btn-primary" style={{ width: '100%' }}>
+                Buy now
+              </button>
+              <ul style={{
+                listStyle: 'none',
+                padding: 0,
+                marginTop: '2rem',
+                textAlign: 'left'
+              }}>
+                <li style={{ padding: '0.5rem 0', color: '#52606D' }}>✓ Everything in Driver</li>
+                <li style={{ padding: '0.5rem 0', color: '#52606D' }}>✓ Lower fees (3%)</li>
+                <li style={{ padding: '0.5rem 0', color: '#52606D' }}>✓ Advanced analytics</li>
+                <li style={{ padding: '0.5rem 0', color: '#52606D' }}>✓ Priority support</li>
+              </ul>
+            </div>
           </div>
+        </div>
+      </section>
+
+      {/* Testimonial Section */}
+      <section style={{ padding: '6rem 2rem', background: 'white' }}>
+        <div className="amo-container" style={{ maxWidth: '900px' }}>
+          <div className="amo-testimonial">
+            <div style={{ fontSize: '6rem', color: 'var(--amo-purple)', opacity: 0.2, lineHeight: 0.5 }}>
+              "
+            </div>
+            <p style={{
+              fontSize: '1.5rem',
+              fontStyle: 'italic',
+              color: '#1F2933',
+              marginBottom: '2rem',
+              lineHeight: '1.8'
+            }}>
+              AmoPagar design on wrm with she's fering, and oneme nairie together prra. We iife wer coollanagations and sendings od a cmwel enach.
+            </p>
+            <p style={{ fontWeight: '600', color: '#8B7DD8', fontSize: '1.125rem' }}>
+              - Learn Maping
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section style={{
+        padding: '6rem 2rem',
+        background: 'linear-gradient(135deg, #8B7DD8 0%, #81C995 100%)',
+        color: 'white'
+      }}>
+        <div className="amo-container amo-text-center">
+          <h2 style={{ fontSize: '2.5rem', fontWeight: '700', marginBottom: '1.5rem' }}>
+            Ready to start accepting payments?
+          </h2>
+          <p style={{ fontSize: '1.25rem', marginBottom: '2rem', opacity: 0.95 }}>
+            Join thousands of vendors already using AmoPagar
+          </p>
+          <Link href="/motorista/cadastro" className="amo-btn" style={{
+            background: 'white',
+            color: '#8B7DD8',
+            padding: '1rem 3rem',
+            fontSize: '1.125rem'
+          }}>
+            Get Started Free
+          </Link>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-8 bg-gray-100">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="mb-4 md:mb-0">
-              <p className="text-sm text-gray-600">AmoPagar © 2025 · Todos os direitos reservados.</p>
-            </div>
+      <footer style={{ padding: '3rem 2rem', background: '#1F2933', color: 'white' }}>
+        <div className="amo-container">
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '2rem',
+            marginBottom: '2rem'
+          }}>
             <div>
-              <Link href="/suporte" className="text-sm text-gray-600 hover:text-purple-600 ml-4">Suporte</Link>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1rem', color: '#8B7DD8' }}>
+                AmoPagar
+              </h3>
+              <p style={{ color: '#9AA5B1', fontSize: '0.875rem' }}>
+                Payments that feel good. Simple, fast, and friendly.
+              </p>
+            </div>
+
+            <div>
+              <h4 style={{ fontWeight: '600', marginBottom: '1rem' }}>Product</h4>
+              <ul style={{ listStyle: 'none', padding: 0 }}>
+                <li style={{ marginBottom: '0.5rem' }}>
+                  <Link href="/features" style={{ color: '#9AA5B1', textDecoration: 'none' }}>Features</Link>
+                </li>
+                <li style={{ marginBottom: '0.5rem' }}>
+                  <Link href="/pricing" style={{ color: '#9AA5B1', textDecoration: 'none' }}>Pricing</Link>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 style={{ fontWeight: '600', marginBottom: '1rem' }}>Support</h4>
+              <ul style={{ listStyle: 'none', padding: 0 }}>
+                <li style={{ marginBottom: '0.5rem' }}>
+                  <Link href="/suporte" style={{ color: '#9AA5B1', textDecoration: 'none' }}>Help Center</Link>
+                </li>
+                <li style={{ marginBottom: '0.5rem' }}>
+                  <Link href="/login" style={{ color: '#9AA5B1', textDecoration: 'none' }}>Login</Link>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div style={{
+            borderTop: '1px solid #3E4C59',
+            paddingTop: '2rem',
+            textAlign: 'center',
+            color: '#9AA5B1',
+            fontSize: '0.875rem'
+          }}>
+            <p>AmoPagar © 2025 · Todos os direitos reservados.</p>
+            <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'center', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span>Powered by</span>
+              <Image src="/images/logos/stripe.png" alt="Stripe" width={60} height={20} unoptimized style={{ opacity: 0.7 }} />
             </div>
           </div>
         </div>
       </footer>
     </main>
-  ) 
+  )
 }
