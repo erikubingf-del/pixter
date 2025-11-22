@@ -22,25 +22,91 @@ export default function Home() {
                 lineHeight: '1.2',
                 color: '#1F2933'
               }}>
-                Payments that feel good. Simple, fast, and friendly.
+                Pagamentos simples, rápidos e confiáveis.
               </h1>
 
               <p style={{
                 fontSize: '1.25rem',
                 color: '#52606D',
-                marginBottom: '2rem',
+                marginBottom: '2.5rem',
                 lineHeight: '1.8'
               }}>
-                Com o AmoPagar, motoristas, feirantes e vendedores aceitam Pix, Cartão de Crédito e Apple Pay direto pelo celular. Rápido, seguro e sem mensalidade.
+                Aceite Pix, Cartão de Crédito e Apple Pay direto pelo celular. Sem maquininha, sem mensalidade.
               </p>
 
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                <Link href="/motorista/cadastro" className="amo-btn amo-btn-primary">
-                  Get Started
+              {/* Dual CTAs */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+                {/* For Drivers */}
+                <div className="amo-card" style={{
+                  padding: '1.5rem',
+                  background: 'linear-gradient(135deg, #D4FC79 0%, #81C995 100%)',
+                  border: 'none'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+                    <span style={{ fontSize: '2rem' }}>🚗</span>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'white', margin: 0 }}>
+                      Para Motoristas e Vendedores
+                    </h3>
+                  </div>
+                  <p style={{ color: 'rgba(255,255,255,0.95)', marginBottom: '1rem', fontSize: '0.95rem' }}>
+                    Receba pagamentos pelo celular. Sem maquininha, sem complicação.
+                  </p>
+                  <Link href="/motorista/cadastro" className="amo-btn" style={{
+                    background: 'white',
+                    color: '#81C995',
+                    fontWeight: '600'
+                  }}>
+                    Cadastrar agora
+                  </Link>
+                </div>
+
+                {/* For Clients */}
+                <div className="amo-card" style={{
+                  padding: '1.5rem',
+                  background: 'linear-gradient(135deg, #E0C3FC 0%, #8B7DD8 100%)',
+                  border: 'none'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+                    <span style={{ fontSize: '2rem' }}>💳</span>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'white', margin: 0 }}>
+                      Para Clientes
+                    </h3>
+                  </div>
+                  <p style={{ color: 'rgba(255,255,255,0.95)', marginBottom: '1rem', fontSize: '0.95rem' }}>
+                    Pague com cartão, Pix ou Apple Pay. Todos os comprovantes em um só lugar.
+                  </p>
+                  <Link href="/cadastro" className="amo-btn" style={{
+                    background: 'white',
+                    color: '#8B7DD8',
+                    fontWeight: '600'
+                  }}>
+                    Criar conta grátis
+                  </Link>
+                </div>
+              </div>
+
+              {/* Login Links */}
+              <div style={{
+                display: 'flex',
+                gap: '1.5rem',
+                flexWrap: 'wrap',
+                fontSize: '0.875rem',
+                color: '#52606D'
+              }}>
+                <Link href="/motorista/login" style={{
+                  color: '#81C995',
+                  fontWeight: '600',
+                  textDecoration: 'none'
+                }}>
+                  → Login Motorista
                 </Link>
-                <button className="amo-btn amo-btn-outline">
-                  How it works
-                </button>
+                <Link href="/login" style={{
+                  color: '#8B7DD8',
+                  fontWeight: '600',
+                  textDecoration: 'none'
+                }}>
+                  → Login Cliente
+                </Link>
               </div>
             </div>
 
