@@ -8,6 +8,39 @@ export default function Home() {
   return (
     <main className="min-h-screen" style={{ background: 'linear-gradient(135deg, #F0E7FC 0%, #E8F5E9 100%)' }}>
 
+      {/* Header with Logo */}
+      <header style={{
+        padding: '1.5rem 2rem',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <Link href="/" style={{ textDecoration: 'none' }}>
+          <h1 style={{
+            fontSize: '2rem',
+            fontWeight: '800',
+            margin: 0
+          }}>
+            <span style={{ color: '#8B7DD8' }}>Amo</span>
+            <span style={{ color: '#81C995' }}>Pagar</span>
+          </h1>
+        </Link>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <Link href="/login" className="amo-btn" style={{
+            background: 'white',
+            color: '#8B7DD8',
+            padding: '0.5rem 1.5rem'
+          }}>
+            Login
+          </Link>
+          <Link href="/motorista/cadastro" className="amo-btn amo-btn-primary" style={{
+            padding: '0.5rem 1.5rem'
+          }}>
+            Cadastrar
+          </Link>
+        </div>
+      </header>
+
       {/* Hero Section */}
       <section className="amo-hero">
         <div className="amo-container">
@@ -158,10 +191,10 @@ export default function Home() {
       <section style={{ padding: '6rem 2rem', background: 'white' }}>
         <div className="amo-container">
           <h2 className="amo-text-center" style={{ fontSize: '2.5rem', fontWeight: '700', marginBottom: '1rem' }}>
-            Features
+            Recursos
           </h2>
           <p className="amo-text-center" style={{ color: '#52606D', marginBottom: '4rem', fontSize: '1.125rem' }}>
-            Everything you need to accept payments anywhere
+            Tudo que você precisa para aceitar pagamentos em qualquer lugar
           </p>
 
           <div style={{
@@ -186,10 +219,10 @@ export default function Home() {
                 📱
               </div>
               <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.75rem' }}>
-                Instant Pix
+                Pix Instantâneo
               </h3>
               <p style={{ color: '#52606D' }}>
-                Playful, custom illustrations to make Instant Pix.
+                Receba pagamentos Pix na hora, com QR Code gerado automaticamente.
               </p>
             </div>
 
@@ -209,10 +242,10 @@ export default function Home() {
                 🔒
               </div>
               <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.75rem' }}>
-                Safe & Secure
+                Seguro e Confiável
               </h3>
               <p style={{ color: '#52606D' }}>
-                Provide custom illustrations to secure safely.
+                Segurança de nível bancário com tecnologia Stripe para proteger suas transações.
               </p>
             </div>
 
@@ -232,112 +265,18 @@ export default function Home() {
                 🤝
               </div>
               <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.75rem' }}>
-                Trusted Vendors
+                Aprovado por Profissionais
               </h3>
               <p style={{ color: '#52606D' }}>
-                Improve custom trusted by trusted vendors.
+                Usado por milhares de motoristas e vendedores em todo o Brasil.
               </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Section */}
-      <section style={{ padding: '6rem 2rem', background: 'linear-gradient(135deg, #F0E7FC 0%, #E8F5E9 100%)' }}>
-        <div className="amo-container">
-          <h2 className="amo-text-center" style={{ fontSize: '2.5rem', fontWeight: '700', marginBottom: '1rem' }}>
-            Pricing
-          </h2>
-          <p className="amo-text-center" style={{ color: '#52606D', marginBottom: '4rem', fontSize: '1.125rem' }}>
-            Simple, transparent pricing for everyone
-          </p>
-
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: '2rem',
-            maxWidth: '800px',
-            margin: '0 auto'
-          }}>
-
-            {/* Free Plan */}
-            <div className="amo-card-pricing">
-              <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1rem', color: '#8B7DD8' }}>
-                Driver
-              </h3>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <span style={{ fontSize: '3rem', fontWeight: '800', color: '#1F2933' }}>R$60</span>
-                <span style={{ color: '#52606D' }}>/month</span>
-              </div>
-              <p style={{ color: '#52606D', marginBottom: '2rem' }}>
-                Prouide your account and priomatiae payment.
-              </p>
-              <button className="amo-btn amo-btn-secondary" style={{ width: '100%' }}>
-                Buy now
-              </button>
-              <ul style={{
-                listStyle: 'none',
-                padding: 0,
-                marginTop: '2rem',
-                textAlign: 'left'
-              }}>
-                <li style={{ padding: '0.5rem 0', color: '#52606D' }}>✓ Accept Pix payments</li>
-                <li style={{ padding: '0.5rem 0', color: '#52606D' }}>✓ Credit card payments</li>
-                <li style={{ padding: '0.5rem 0', color: '#52606D' }}>✓ Basic dashboard</li>
-              </ul>
-            </div>
-
-            {/* Pro Plan */}
-            <div className="amo-card-pricing" style={{
-              border: '3px solid var(--amo-purple)',
-              transform: 'scale(1.05)',
-              position: 'relative'
-            }}>
-              <div style={{
-                position: 'absolute',
-                top: '-1rem',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                background: 'var(--amo-purple)',
-                color: 'white',
-                padding: '0.5rem 1.5rem',
-                borderRadius: 'var(--amo-radius-full)',
-                fontSize: '0.875rem',
-                fontWeight: '600'
-              }}>
-                MOST POPULAR
-              </div>
-              <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1rem', color: '#8B7DD8' }}>
-                Business
-              </h3>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <span style={{ fontSize: '3rem', fontWeight: '800', color: '#1F2933' }}>R$135</span>
-                <span style={{ color: '#52606D' }}>/month</span>
-              </div>
-              <p style={{ color: '#52606D', marginBottom: '2rem' }}>
-                Prouide delear cards for existing payments.
-              </p>
-              <button className="amo-btn amo-btn-primary" style={{ width: '100%' }}>
-                Buy now
-              </button>
-              <ul style={{
-                listStyle: 'none',
-                padding: 0,
-                marginTop: '2rem',
-                textAlign: 'left'
-              }}>
-                <li style={{ padding: '0.5rem 0', color: '#52606D' }}>✓ Everything in Driver</li>
-                <li style={{ padding: '0.5rem 0', color: '#52606D' }}>✓ Lower fees (3%)</li>
-                <li style={{ padding: '0.5rem 0', color: '#52606D' }}>✓ Advanced analytics</li>
-                <li style={{ padding: '0.5rem 0', color: '#52606D' }}>✓ Priority support</li>
-              </ul>
             </div>
           </div>
         </div>
       </section>
 
       {/* Testimonial Section */}
-      <section style={{ padding: '6rem 2rem', background: 'white' }}>
+      <section style={{ padding: '6rem 2rem', background: 'linear-gradient(135deg, #F0E7FC 0%, #E8F5E9 100%)' }}>
         <div className="amo-container" style={{ maxWidth: '900px' }}>
           <div className="amo-testimonial">
             <div style={{ fontSize: '6rem', color: 'var(--amo-purple)', opacity: 0.2, lineHeight: 0.5 }}>
@@ -350,10 +289,10 @@ export default function Home() {
               marginBottom: '2rem',
               lineHeight: '1.8'
             }}>
-              AmoPagar design on wrm with she's fering, and oneme nairie together prra. We iife wer coollanagations and sendings od a cmwel enach.
+              O AmoPagar transformou a forma como recebo pagamentos dos meus clientes. Simples, rápido e sem complicação. Recomendo para todos os motoristas!
             </p>
             <p style={{ fontWeight: '600', color: '#8B7DD8', fontSize: '1.125rem' }}>
-              - Learn Maping
+              - João Silva, Motorista de Aplicativo
             </p>
           </div>
         </div>
@@ -367,10 +306,10 @@ export default function Home() {
       }}>
         <div className="amo-container amo-text-center">
           <h2 style={{ fontSize: '2.5rem', fontWeight: '700', marginBottom: '1.5rem' }}>
-            Ready to start accepting payments?
+            Pronto para começar a aceitar pagamentos?
           </h2>
           <p style={{ fontSize: '1.25rem', marginBottom: '2rem', opacity: 0.95 }}>
-            Join thousands of vendors already using AmoPagar
+            Junte-se a milhares de profissionais que já usam AmoPagar
           </p>
           <Link href="/motorista/cadastro" className="amo-btn" style={{
             background: 'white',
@@ -378,7 +317,7 @@ export default function Home() {
             padding: '1rem 3rem',
             fontSize: '1.125rem'
           }}>
-            Get Started Free
+            Começar Grátis
           </Link>
         </div>
       </section>
@@ -393,34 +332,35 @@ export default function Home() {
             marginBottom: '2rem'
           }}>
             <div>
-              <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1rem', color: '#8B7DD8' }}>
-                AmoPagar
+              <h3 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1rem' }}>
+                <span style={{ color: '#8B7DD8' }}>Amo</span>
+                <span style={{ color: '#81C995' }}>Pagar</span>
               </h3>
               <p style={{ color: '#9AA5B1', fontSize: '0.875rem' }}>
-                Payments that feel good. Simple, fast, and friendly.
+                Pagamentos que fazem você se sentir bem. Simples, rápido e amigável.
               </p>
             </div>
 
             <div>
-              <h4 style={{ fontWeight: '600', marginBottom: '1rem' }}>Product</h4>
+              <h4 style={{ fontWeight: '600', marginBottom: '1rem' }}>Produto</h4>
               <ul style={{ listStyle: 'none', padding: 0 }}>
                 <li style={{ marginBottom: '0.5rem' }}>
-                  <Link href="/features" style={{ color: '#9AA5B1', textDecoration: 'none' }}>Features</Link>
+                  <Link href="/motorista/cadastro" style={{ color: '#9AA5B1', textDecoration: 'none' }}>Cadastro</Link>
                 </li>
                 <li style={{ marginBottom: '0.5rem' }}>
-                  <Link href="/pricing" style={{ color: '#9AA5B1', textDecoration: 'none' }}>Pricing</Link>
+                  <Link href="/login" style={{ color: '#9AA5B1', textDecoration: 'none' }}>Login</Link>
                 </li>
               </ul>
             </div>
 
             <div>
-              <h4 style={{ fontWeight: '600', marginBottom: '1rem' }}>Support</h4>
+              <h4 style={{ fontWeight: '600', marginBottom: '1rem' }}>Suporte</h4>
               <ul style={{ listStyle: 'none', padding: 0 }}>
                 <li style={{ marginBottom: '0.5rem' }}>
-                  <Link href="/suporte" style={{ color: '#9AA5B1', textDecoration: 'none' }}>Help Center</Link>
+                  <Link href="/motorista/login" style={{ color: '#9AA5B1', textDecoration: 'none' }}>Login Motorista</Link>
                 </li>
                 <li style={{ marginBottom: '0.5rem' }}>
-                  <Link href="/login" style={{ color: '#9AA5B1', textDecoration: 'none' }}>Login</Link>
+                  <Link href="/cadastro" style={{ color: '#9AA5B1', textDecoration: 'none' }}>Criar Conta</Link>
                 </li>
               </ul>
             </div>
