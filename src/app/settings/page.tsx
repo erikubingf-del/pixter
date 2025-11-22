@@ -11,8 +11,10 @@ interface Profile {
   nome: string
   email: string | null
   celular: string | null
+  cpf: string | null
   tipo: 'cliente' | 'motorista'
   stripe_account_id: string | null
+  pix_key: string | null
   avatar_url: string | null
   company_name: string | null
   address: string | null
@@ -32,6 +34,7 @@ export default function SettingsPage() {
     nome: '',
     company_name: '',
     address: '',
+    pix_key: '',
   })
 
   // Redirect if not authenticated
@@ -57,6 +60,7 @@ export default function SettingsPage() {
             nome: data.profile.nome || '',
             company_name: data.profile.company_name || '',
             address: data.profile.address || '',
+            pix_key: data.profile.pix_key || '',
           })
         }
       } catch (err: any) {
@@ -387,6 +391,38 @@ export default function SettingsPage() {
                 }}
               />
             </div>
+
+            {/* Pix Key (only for drivers) */}
+            {isDriver && (
+              <div>
+                <label htmlFor="pix_key" style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#1F2933',
+                  marginBottom: '0.5rem'
+                }}>
+                  📱 Chave Pix (para receber pagamentos)
+                </label>
+                <input
+                  id="pix_key"
+                  name="pix_key"
+                  type="text"
+                  value={formData.pix_key}
+                  onChange={handleChange}
+                  className="amo-input"
+                  placeholder="CPF, celular, email ou chave aleatória"
+                />
+                <p style={{
+                  fontSize: '0.75rem',
+                  color: '#9AA5B1',
+                  marginTop: '0.25rem'
+                }}>
+                  {profile?.cpf && `Sugestão: Use seu CPF (${profile.cpf})`}
+                  {!profile?.cpf && profile?.celular && `Sugestão: Use seu celular (${profile.celular})`}
+                </p>
+              </div>
+            )}
 
             <button
               type="submit"

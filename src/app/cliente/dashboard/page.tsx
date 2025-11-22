@@ -23,6 +23,7 @@ interface Payment {
 interface Profile {
   tipo: 'cliente' | 'motorista'
   stripe_account_id: string | null
+  pix_key: string | null
   celular: string | null
 }
 
@@ -657,6 +658,129 @@ export default function UnifiedDashboard() {
                       Conectar Stripe →
                     </Link>
                   </div>
+                )}
+              </div>
+
+              {/* Pix Status Card */}
+              <div style={{
+                background: profile.pix_key
+                  ? 'linear-gradient(135deg, #D1FAE5 0%, #E8F5E9 100%)'
+                  : 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+                borderRadius: 'var(--amo-radius-md)',
+                padding: '1.5rem',
+                marginBottom: '1.5rem',
+                border: profile.pix_key
+                  ? '2px solid #10B981'
+                  : '2px solid #F59E0B'
+              }}>
+                <h3 style={{
+                  fontSize: '1.125rem',
+                  fontWeight: '700',
+                  color: '#1F2933',
+                  marginBottom: '1rem'
+                }}>
+                  {profile.pix_key ? '✅ Pix Configurado' : '⚠️ Configure seu Pix'}
+                </h3>
+
+                {profile.pix_key ? (
+                  <>
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.75rem',
+                      marginBottom: '1rem'
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.875rem'
+                      }}>
+                        <span>✅</span>
+                        <span style={{ color: '#52606D' }}>
+                          Recebimento via Pix ativo
+                        </span>
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.875rem'
+                      }}>
+                        <span>📱</span>
+                        <span style={{ color: '#52606D', fontFamily: 'monospace' }}>
+                          {profile.pix_key}
+                        </span>
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.875rem'
+                      }}>
+                        <span>💰</span>
+                        <span style={{ color: '#52606D' }}>
+                          Sem taxas! Receba 100% do valor
+                        </span>
+                      </div>
+                    </div>
+
+                    <Link
+                      href="/settings"
+                      style={{
+                        color: '#8B7DD8',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        textDecoration: 'none'
+                      }}
+                    >
+                      Alterar Chave Pix →
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <p style={{
+                      fontSize: '0.875rem',
+                      color: '#92400E',
+                      marginBottom: '1rem'
+                    }}>
+                      Configure sua chave Pix para receber pagamentos instantâneos sem taxas!
+                    </p>
+
+                    <div style={{
+                      background: 'rgba(252, 211, 77, 0.2)',
+                      borderRadius: 'var(--amo-radius-md)',
+                      padding: '0.75rem',
+                      marginBottom: '1rem'
+                    }}>
+                      <p style={{
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        color: '#92400E',
+                        marginBottom: '0.5rem'
+                      }}>
+                        💡 Vantagens do Pix:
+                      </p>
+                      <ul style={{
+                        fontSize: '0.75rem',
+                        color: '#92400E',
+                        paddingLeft: '1.25rem',
+                        margin: 0
+                      }}>
+                        <li>Receba 100% do valor (sem taxas!)</li>
+                        <li>Dinheiro cai na hora</li>
+                        <li>Disponível 24/7</li>
+                      </ul>
+                    </div>
+
+                    <Link
+                      href="/settings"
+                      className="amo-btn amo-btn-secondary"
+                      style={{ display: 'inline-block' }}
+                    >
+                      Configurar Pix Agora →
+                    </Link>
+                  </>
                 )}
               </div>
 
