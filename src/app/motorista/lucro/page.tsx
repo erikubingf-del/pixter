@@ -24,6 +24,18 @@ interface Analytics {
   byMethod: { method: string; total: number; count: number }[]
 }
 
+interface StripeStatus {
+  connected: boolean
+  charges_enabled: boolean
+  payouts_enabled: boolean
+  details_submitted: boolean
+  requirements?: {
+    currently_due: string[]
+    eventually_due: string[]
+    past_due: string[]
+  }
+}
+
 const weekdayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
 
 export default function LucroPage() {
@@ -32,6 +44,7 @@ export default function LucroPage() {
 
   const [payments, setPayments] = useState<Payment[]>([])
   const [analytics, setAnalytics] = useState<Analytics | null>(null)
+  const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [dateRange, setDateRange] = useState('30') // 7, 30, 90 days
@@ -63,6 +76,13 @@ export default function LucroPage() {
 
         // Calculate analytics
         calculateAnalytics(data.payments || [])
+
+        // Fetch Stripe status
+        const stripeRes = await fetch('/api/stripe/status')
+        if (stripeRes.ok) {
+          const stripeData = await stripeRes.json()
+          setStripeStatus(stripeData)
+        }
       } catch (err: any) {
         console.error('Error fetching payments:', err)
         setError(err.message || 'Failed to load data')
@@ -246,6 +266,127 @@ export default function LucroPage() {
             ← Voltar ao Dashboard
           </Link>
         </div>
+
+        {/* Stripe Connection Status Banner */}
+        {stripeStatus && (
+          <div className="amo-card amo-fade-in" style={{
+            marginBottom: '1.5rem',
+            background: stripeStatus.connected
+              ? (stripeStatus.charges_enabled && stripeStatus.payouts_enabled
+                ? 'linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%)'
+                : 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)')
+              : 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)',
+            border: stripeStatus.connected
+              ? (stripeStatus.charges_enabled && stripeStatus.payouts_enabled
+                ? '2px solid #10B981'
+                : '2px solid #F59E0B')
+              : '2px solid #EF4444'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '1rem'
+            }}>
+              <span style={{ fontSize: '2rem', flexShrink: 0 }}>
+                {stripeStatus.connected
+                  ? (stripeStatus.charges_enabled && stripeStatus.payouts_enabled ? '✅' : '⚠️')
+                  : '🔒'}
+              </span>
+              <div style={{ flex: 1 }}>
+                <h3 style={{
+                  fontSize: '1.125rem',
+                  fontWeight: '700',
+                  color: '#1F2933',
+                  marginBottom: '0.5rem'
+                }}>
+                  {stripeStatus.connected
+                    ? (stripeStatus.charges_enabled && stripeStatus.payouts_enabled
+                      ? 'Conta Stripe Ativa'
+                      : 'Ação Necessária na Conta Stripe')
+                    : 'Conecte sua Conta Stripe'}
+                </h3>
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: '#52606D',
+                  marginBottom: '0.75rem'
+                }}>
+                  {stripeStatus.connected
+                    ? (stripeStatus.charges_enabled && stripeStatus.payouts_enabled
+                      ? 'Tudo funcionando perfeitamente! Você pode receber pagamentos.'
+                      : 'Sua conta precisa de informações adicionais para continuar recebendo.')
+                    : 'Conecte sua conta Stripe para começar a receber pagamentos dos clientes.'}
+                </p>
+
+                {stripeStatus.connected && (
+                  <div style={{
+                    display: 'flex',
+                    gap: '1.5rem',
+                    fontSize: '0.875rem',
+                    marginBottom: '0.75rem'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span>{stripeStatus.charges_enabled ? '✅' : '❌'}</span>
+                      <span style={{ color: '#52606D' }}>
+                        {stripeStatus.charges_enabled ? 'Pagamentos ativos' : 'Pagamentos desabilitados'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span>{stripeStatus.payouts_enabled ? '✅' : '❌'}</span>
+                      <span style={{ color: '#52606D' }}>
+                        {stripeStatus.payouts_enabled ? 'Saques ativos' : 'Saques desabilitados'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span>{stripeStatus.details_submitted ? '✅' : '⏳'}</span>
+                      <span style={{ color: '#52606D' }}>
+                        {stripeStatus.details_submitted ? 'Dados completos' : 'Dados pendentes'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {stripeStatus.requirements && (
+                  stripeStatus.requirements.currently_due.length > 0 ||
+                  stripeStatus.requirements.past_due.length > 0
+                ) && (
+                  <div style={{
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    borderRadius: 'var(--amo-radius-md)',
+                    padding: '0.75rem',
+                    marginBottom: '0.75rem'
+                  }}>
+                    <p style={{
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#DC2626',
+                      marginBottom: '0.5rem'
+                    }}>
+                      ⚠️ Pendências:
+                    </p>
+                    <ul style={{
+                      fontSize: '0.875rem',
+                      color: '#991B1B',
+                      paddingLeft: '1.25rem',
+                      margin: 0
+                    }}>
+                      {[...stripeStatus.requirements.past_due, ...stripeStatus.requirements.currently_due].slice(0, 3).map((req, idx) => (
+                        <li key={idx}>{req.replace(/_/g, ' ')}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <Link
+                  href="/settings"
+                  className="amo-btn amo-btn-secondary"
+                  style={{ display: 'inline-block' }}
+                >
+                  {stripeStatus.connected ? 'Gerenciar Conta Stripe' : 'Conectar Stripe Agora'} →
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Date Range Filter */}
         <div className="amo-card" style={{ marginBottom: '1.5rem' }}>

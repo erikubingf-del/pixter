@@ -26,12 +26,25 @@ interface Profile {
   celular: string | null
 }
 
+interface StripeStatus {
+  connected: boolean
+  charges_enabled: boolean
+  payouts_enabled: boolean
+  details_submitted: boolean
+  requirements?: {
+    currently_due: string[]
+    eventually_due: string[]
+    past_due: string[]
+  }
+}
+
 export default function UnifiedDashboard() {
   const router = useRouter()
   const { data: session, status } = useSession()
 
   const [payments, setPayments] = useState<Payment[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showQRCode, setShowQRCode] = useState(false)
@@ -65,6 +78,15 @@ export default function UnifiedDashboard() {
         if (paymentsRes.ok) {
           const paymentsData = await paymentsRes.json()
           setPayments(paymentsData.payments?.slice(0, 5) || [])
+        }
+
+        // Fetch Stripe status if driver
+        if (profileData.profile?.tipo === 'motorista') {
+          const stripeRes = await fetch('/api/stripe/status')
+          if (stripeRes.ok) {
+            const stripeData = await stripeRes.json()
+            setStripeStatus(stripeData)
+          }
         }
       } catch (err: any) {
         console.error('Error fetching data:', err)
@@ -498,10 +520,19 @@ export default function UnifiedDashboard() {
 
               {/* Stripe Alerts */}
               <div style={{
-                background: 'white',
+                background: stripeStatus?.connected
+                  ? (stripeStatus.charges_enabled && stripeStatus.payouts_enabled
+                    ? 'linear-gradient(135deg, #D1FAE5 0%, #E8F5E9 100%)'
+                    : 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)')
+                  : 'white',
                 borderRadius: 'var(--amo-radius-md)',
                 padding: '1.5rem',
-                marginBottom: '1.5rem'
+                marginBottom: '1.5rem',
+                border: stripeStatus?.connected
+                  ? (stripeStatus.charges_enabled && stripeStatus.payouts_enabled
+                    ? '2px solid #10B981'
+                    : '2px solid #F59E0B')
+                  : '2px solid #E4E7EB'
               }}>
                 <h3 style={{
                   fontSize: '1.125rem',
@@ -509,23 +540,87 @@ export default function UnifiedDashboard() {
                   color: '#1F2933',
                   marginBottom: '1rem'
                 }}>
-                  ⚠️ Alertas da Conta
+                  {stripeStatus?.connected
+                    ? (stripeStatus.charges_enabled && stripeStatus.payouts_enabled
+                      ? '✅ Status da Conta'
+                      : '⚠️ Ação Necessária')
+                    : '⚠️ Alertas da Conta'}
                 </h3>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    fontSize: '0.875rem'
-                  }}>
-                    <span>{isStripeConnected ? '✅' : '⚠️'}</span>
-                    <span style={{ color: '#52606D' }}>
-                      {isStripeConnected ? 'Conta ativa e pronta' : 'Stripe não conectado'}
-                    </span>
-                  </div>
+                {stripeStatus?.connected ? (
+                  <>
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.75rem',
+                      marginBottom: '1rem'
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.875rem'
+                      }}>
+                        <span>{stripeStatus.charges_enabled ? '✅' : '❌'}</span>
+                        <span style={{ color: '#52606D' }}>
+                          {stripeStatus.charges_enabled ? 'Receber pagamentos' : 'Pagamentos desabilitados'}
+                        </span>
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.875rem'
+                      }}>
+                        <span>{stripeStatus.payouts_enabled ? '✅' : '❌'}</span>
+                        <span style={{ color: '#52606D' }}>
+                          {stripeStatus.payouts_enabled ? 'Saques habilitados' : 'Saques desabilitados'}
+                        </span>
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        fontSize: '0.875rem'
+                      }}>
+                        <span>{stripeStatus.details_submitted ? '✅' : '⏳'}</span>
+                        <span style={{ color: '#52606D' }}>
+                          {stripeStatus.details_submitted ? 'Cadastro completo' : 'Dados pendentes'}
+                        </span>
+                      </div>
+                    </div>
 
-                  {isStripeConnected && (
+                    {stripeStatus.requirements && (
+                      stripeStatus.requirements.currently_due.length > 0 ||
+                      stripeStatus.requirements.past_due.length > 0
+                    ) && (
+                      <div style={{
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        borderRadius: 'var(--amo-radius-md)',
+                        padding: '0.75rem',
+                        marginBottom: '1rem'
+                      }}>
+                        <p style={{
+                          fontSize: '0.875rem',
+                          fontWeight: '600',
+                          color: '#DC2626',
+                          marginBottom: '0.5rem'
+                        }}>
+                          Pendências detectadas:
+                        </p>
+                        <ul style={{
+                          fontSize: '0.75rem',
+                          color: '#991B1B',
+                          paddingLeft: '1.25rem',
+                          margin: 0
+                        }}>
+                          {[...stripeStatus.requirements.past_due, ...stripeStatus.requirements.currently_due].slice(0, 2).map((req, idx) => (
+                            <li key={idx}>{req.replace(/_/g, ' ')}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
                     <Link
                       href="/settings"
                       style={{
@@ -537,8 +632,32 @@ export default function UnifiedDashboard() {
                     >
                       Gerenciar Conta Stripe →
                     </Link>
-                  )}
-                </div>
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      fontSize: '0.875rem'
+                    }}>
+                      <span>⚠️</span>
+                      <span style={{ color: '#52606D' }}>Stripe não conectado</span>
+                    </div>
+
+                    <Link
+                      href="/settings"
+                      style={{
+                        color: '#8B7DD8',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        textDecoration: 'none'
+                      }}
+                    >
+                      Conectar Stripe →
+                    </Link>
+                  </div>
+                )}
               </div>
 
               {/* Lucro Analytics Link */}
