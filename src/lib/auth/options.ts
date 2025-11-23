@@ -375,13 +375,18 @@ export const authOptions: NextAuthOptions = {
             try {
               const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers();
 
-              if (listError) {
+              if (listError || !listData) {
                 console.error("Error listing users:", listError);
                 return true; // Continue with NextAuth session only
               }
 
               const userEmail = user.email;
-              const existingUser = listData.users.find(u => u.email === userEmail);
+              if (!userEmail) {
+                console.error("No email provided for user");
+                return true;
+              }
+
+              const existingUser = listData.users?.find((u: any) => u.email === userEmail);
 
               if (existingUser) {
                 console.log("Found existing user via Admin API:", existingUser.id);
