@@ -380,7 +380,8 @@ export const authOptions: NextAuthOptions = {
                 return true; // Continue with NextAuth session only
               }
 
-              const existingUser = listData.users.find(u => u.email === user.email);
+              const userEmail = user.email;
+              const existingUser = listData.users.find(u => u.email === userEmail);
 
               if (existingUser) {
                 console.log("Found existing user via Admin API:", existingUser.id);
