@@ -184,7 +184,7 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
-          // Then find the profile
+          // Find or create profile
           let profile;
           const { data: existingProfile, error: profileError } =
             await supabaseServer
@@ -252,56 +252,76 @@ export const authOptions: NextAuthOptions = {
               return {
                 id: verifyData.user.id,
                 email: phoneProfile.email || "",
-                name: phoneProfile.nome || "",
+                name: phoneProfile.nome || formattedPhone,
                 image: phoneProfile.avatar_url || "",
-                tipo: phoneProfile.tipo || "",
-                account: phoneProfile.account || "phone",
-                stripeAccountId: profile?.stripe_account_id || "",
+                tipo: "motorista",
+                account: "phone",
+                stripeAccountId: phoneProfile?.stripe_account_id || "",
               };
             }
           }
 
-          // If no profile exists after checking both ID and phone, return null (don't create account)
+          // If no profile exists, create a new driver profile automatically
+          let isNewProfile = false;
           if (!existingProfile && !profile) {
             console.log(
-              "No profile found for phone number. User needs to register first."
+              "No profile found. Creating new driver profile for:",
+              verifyData.user.id
             );
-            // Delete the authentication user since we don't want to keep auth entries without profiles
-            try {
-              await supabaseAdmin.auth.admin.deleteUser(verifyData.user.id);
-              console.log(
-                "Deleted auth user since no profile exists:",
-                verifyData.user.id
-              );
-            } catch (deleteErr) {
-              console.error("Error deleting auth user:", deleteErr);
+
+            const newProfilePayload = {
+              id: verifyData.user.id,
+              celular: formattedPhone,
+              tipo: "motorista",
+              nome: formattedPhone, // Use phone as temporary name
+              account: "phone",
+              verified: true,
+              onboarding_completed: false, // Track onboarding status
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+
+            const { error: createError } = await supabaseServer
+              .from("profiles")
+              .insert(newProfilePayload);
+
+            if (createError) {
+              console.error("Error creating driver profile:", createError);
+              return null;
             }
 
-            // Return null with a custom error that will be displayed to the user
-            throw new Error(
-              "Usuário não encontrado. Por favor, crie uma conta primeiro."
-            );
+            console.log("Driver profile created successfully");
+            profile = newProfilePayload;
+            isNewProfile = true;
           } else {
             profile = existingProfile || profile;
           }
 
-          // Verify the profile is a driver
+          // Ensure profile is motorista type
           if (profile.tipo !== "motorista") {
-            console.error(
-              "User exists but is not a driver:",
-              verifyData.user.id
+            console.log(
+              "Profile exists but is not motorista. Updating to motorista..."
             );
-            return null;
+            const { error: updateTypeError } = await supabaseServer
+              .from("profiles")
+              .update({ tipo: "motorista" })
+              .eq("id", verifyData.user.id);
+
+            if (updateTypeError) {
+              console.error("Error updating profile type:", updateTypeError);
+            } else {
+              profile.tipo = "motorista";
+            }
           }
 
           // Return user object
           return {
             id: profile.id,
             email: profile.email || "",
-            name: profile.nome || "",
+            name: profile.nome || formattedPhone,
             image: profile.avatar_url || "",
-            tipo: profile.tipo || "",
-            account: profile.account || "phone",
+            tipo: "motorista",
+            account: "phone",
             stripeAccountId: profile?.stripe_account_id || "",
           };
         } catch (err) {
@@ -336,44 +356,47 @@ export const authOptions: NextAuthOptions = {
             return true;
           }
 
-          // 2. For users that exist in Auth but don't have a profile:
-          // Instead of trying to create a user, just skip that step
-          // and create only the profile record
+          // 2. For new Google users, create the auth user and profile
+          // Try to create the user - if they already exist, we'll get their ID from the error
+          const { data: authUser, error: authError } =
+            await supabaseAdmin.auth.admin.createUser({
+              email: user.email,
+              email_confirm: true,
+              user_metadata: {
+                nome: user.name || "",
+                avatar_url: user.image || null,
+              },
+            });
 
-          // To get the user ID, use the admin client to search for users by email
-          const { data: users, error: adminError } = await supabaseAdmin
-            .from("auth.users")
-            .select("id")
-            .eq("email", user.email)
-            .single();
+          if (authError) {
+            // User might already exist - try to find them using Admin API
+            console.log("User might already exist, attempting to find via Admin API");
 
-          if (adminError) {
-            console.error("Error checking for existing user:", adminError);
+            try {
+              const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers();
 
-            // Fall back to creating a new user
-            const { data: authUser, error: authError } =
-              await supabaseAdmin.auth.admin.createUser({
-                email: user.email,
-                email_confirm: true,
-                user_metadata: {
-                  nome: user.name || "",
-                  avatar_url: user.image || null,
-                },
-              });
+              if (listError) {
+                console.error("Error listing users:", listError);
+                return true; // Continue with NextAuth session only
+              }
 
-            if (authError) {
-              // If we still get an error, just use NextAuth's session
-              console.error("Auth user creation error:", authError);
-              console.log("Using NextAuth session without Supabase link");
-              return true;
+              const existingUser = listData.users.find(u => u.email === user.email);
+
+              if (existingUser) {
+                console.log("Found existing user via Admin API:", existingUser.id);
+                user.id = existingUser.id;
+              } else {
+                console.error("Could not find user after creation failed");
+                return true; // Continue with NextAuth session only
+              }
+            } catch (e) {
+              console.error("Exception finding user:", e);
+              return true; // Continue with NextAuth session only
             }
-
-            // Set user ID for profile creation
-            user.id = authUser.user.id;
           } else {
-            // Found existing user in Supabase Auth
-            console.log("Found existing user in Supabase Auth:", users.id);
-            user.id = users.id;
+            // Successfully created new user
+            console.log("Successfully created new auth user:", authUser.user.id);
+            user.id = authUser.user.id;
           }
 
           // Create profile

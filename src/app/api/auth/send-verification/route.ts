@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       'check_sms_rate_limit_phone',
       {
         p_phone: formattedPhone,
-        p_max_attempts: 3,
+        p_max_attempts: 10,
         p_window_minutes: 60
       }
     );
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error: 'Muitas solicitações para este número',
-          details: 'Você atingiu o limite de 3 códigos por hora para este número. Tente novamente mais tarde.'
+          details: 'Você atingiu o limite de 10 códigos por hora para este número. Tente novamente mais tarde.'
         },
         { status: 429 }
       );

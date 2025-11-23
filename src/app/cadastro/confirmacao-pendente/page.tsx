@@ -74,8 +74,15 @@ export default function ConfirmationPending() {
     <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8 text-center">
         <div className="mb-6">
-          <Link href="/" className="text-3xl font-bold text-gray-900">
-            Pixter
+          <Link href="/" style={{ textDecoration: 'none' }}>
+            <h1 style={{
+              fontSize: '2rem',
+              fontWeight: '800',
+              marginBottom: '0'
+            }}>
+              <span style={{ color: '#8B7DD8' }}>Amo</span>
+              <span style={{ color: '#81C995' }}>Pagar</span>
+            </h1>
           </Link>
         </div>
 

@@ -3,22 +3,34 @@
    ────────────────────────────────────────────────────────────── */
    import { createClient, User } from '@supabase/supabase-js';
    import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'; // Import Auth Helper
-   
+
    /*──────────────── VARIÁVEIS DE AMBIENTE ───────────────*/
    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
    /*──────────────── CLIENTES ────────────────────────────*/
-   // Server-side instance (uses service key, ONLY for backend/API routes)
-   // Use placeholder values during build when env vars unavailable
-   // Real values will be used at runtime in Vercel with proper env vars
-   const buildTimeUrl = 'https://xxxxxxxxxxx.supabase.co'; // Valid format for build
-   const buildTimeKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4eHh4eHh4eHh4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTYwMDAwMDAwMCwiZXhwIjoxOTAwMDAwMDAwfQ.placeholder'; // Valid JWT format
+   // Placeholder values for build time - these are never used at runtime
+   const buildTimeUrl = 'https://placeholder.supabase.co';
+   const buildTimeAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2MDAwMDAwMDAsImV4cCI6MTkwMDAwMDAwMH0.placeholder';
+   const buildTimeServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTYwMDAwMDAwMCwiZXhwIjoxOTAwMDAwMDAwfQ.placeholder';
 
+   // Validation function to check if we have real credentials
+   function validateSupabaseConfig() {
+     if (typeof window !== 'undefined') {
+       // Client-side: require NEXT_PUBLIC vars
+       if (!supabaseUrl || !supabaseAnonKey || supabaseUrl === buildTimeUrl) {
+         console.error('⚠️ Supabase configuration missing! Make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your environment.');
+         return false;
+       }
+     }
+     return true;
+   }
+
+   // Server-side client (uses service key, ONLY for backend/API routes)
    export const supabaseServer = createClient(
      supabaseUrl || buildTimeUrl,
-     supabaseServiceKey || buildTimeKey,
+     supabaseServiceKey || buildTimeServiceKey,
      {
        auth: {
          persistSession: false,
@@ -28,11 +40,20 @@
    );
 
    export const supabaseAdmin = supabaseServer;  // alias for Admin API
+
+   // Client-side browser client (uses anon key, safe for frontend)
+   // This MUST have real env vars at runtime
+   export function createBrowserClient() {
+     validateSupabaseConfig();
+
+     // Use auth-helpers for NextJS SSR compatibility
+     return createClientComponentClient();
+   }
    
    /*──────────────── EMAIL/PASSWORD SIGNUP (Client-Side) ──*/
    // Added back based on user request, with fix for unconfirmed emails
    export async function signUpWithEmail(email: string, password: string, optionsData?: { celular?: string; nome?: string; cpf?: string; tipo?: string }) {
-     const supabase = createClientComponentClient(); // Use Auth Helper client
+     const supabase = createBrowserClient();
      // Use the client-side supabase instance for sign-up initiated from the browser
      const { data, error } = await supabase.auth.signUp({
        email,
@@ -78,7 +99,7 @@
      code: string,
      minutes = 10
    ) => {
-     const supabase = createClientComponentClient(); // Use Auth Helper client
+     const supabase = createBrowserClient();
      return supabase
        .from('verification_codes')
        .upsert({
@@ -90,7 +111,7 @@
    };
    
    export const verifyCode = async (phone: string, code: string) => {
-     const supabase = createClientComponentClient(); // Use Auth Helper client
+     const supabase = createBrowserClient();
      return supabase
        .from('verification_codes')
        .select('*')
@@ -101,26 +122,39 @@
    };
    
    export const deleteVerificationCode = async (phone: string) => {
-     const supabase = createClientComponentClient(); // Use Auth Helper client
+     const supabase = createBrowserClient();
      return supabase.from('verification_codes').delete().eq('phone', phone);
    };
    
    /*──────────────── UTIL ────────────────────────────────*/
 export const formatPhoneNumber = (phone: string, code = '55') => {
-    // If the phone number already starts with +, return it as is
+    // Only accept Brazilian phone numbers (+55)
+    if (code !== '55') {
+      throw new Error('Apenas números brasileiros (+55) são aceitos no momento');
+    }
+
+    // If the phone number already starts with +, validate it's +55
     if (phone.startsWith('+')) {
+      if (!phone.startsWith('+55')) {
+        throw new Error('Apenas números brasileiros (+55) são aceitos no momento');
+      }
       return phone;
     }
 
     // Remove all non-digit characters
     const digitsOnly = phone.replace(/\D/g, '');
-    
+
+    // Validate Brazilian phone number length (should be 10-11 digits after country code)
+    if (digitsOnly.length < 10 || digitsOnly.length > 11) {
+      throw new Error('Número de telefone inválido. Use o formato: (11) 99999-9999');
+    }
+
     // Handle Brazilian numbers - remove leading zero if present
     if (code === '55' && digitsOnly.startsWith('0')) {
       return `+${code}${digitsOnly.substring(1)}`;
     }
-    
-    // Original logic for other cases
+
+    // Original logic for Brazilian numbers
     return digitsOnly.startsWith(code) ? `+${digitsOnly}` : `+${code}${digitsOnly}`;
 };
    
@@ -220,35 +254,35 @@ export const formatPhoneNumber = (phone: string, code = '55') => {
    /*──────────────── sign-in OTP via telefone (Client-Side) ──*/
    // Uses standard phone OTP sign-in.
    export const signInWithPhone = (phone: string) => {
-     const supabase = createClientComponentClient(); // Use Auth Helper client
+     const supabase = createBrowserClient();
      const formattedPhone = formatPhoneNumber(phone);
      return supabase.auth.signInWithOtp({ phone: formattedPhone });
    };
-   
+
    /*──────────────── CRUD perfil / storage (Client-Side) ──*/
    // Use client instance assuming called from frontend where user is authenticated.
    // RLS policies MUST allow users to perform these actions on their own data.
-   
+
    export const getProfile = (id: string) => {
-     const supabase = createClientComponentClient(); // Use Auth Helper client
+     const supabase = createBrowserClient();
      return supabase.from("profiles").select("*").eq("id", id).single();
    };
-   
+
    export const updateProfile = (id: string, updates: Record<string, any>) => {
-     const supabase = createClientComponentClient(); // Use Auth Helper client
+     const supabase = createBrowserClient();
      return supabase
        .from('profiles')
        .update({ ...updates, updated_at: new Date().toISOString() })
        .eq('id', id); // RLS policy `auth.uid() = id` will enforce security
    };
-   
+
    export const uploadImage = (bucket: string, path: string, file: File) => {
-     const supabase = createClientComponentClient(); // Use Auth Helper client
+     const supabase = createBrowserClient();
      return supabase.storage.from(bucket).upload(path, file, { upsert: true });
    };
-   
+
    export const getImageUrl = (bucket: string, path: string) => {
-     const supabase = createClientComponentClient(); // Use Auth Helper client
+     const supabase = createBrowserClient();
      // Note: getPublicUrl does not require the user to be authenticated if the bucket is public.
      // If the bucket is private, you'd need different logic (e.g., createSignedUrl).
      const { data } = supabase.storage.from(bucket).getPublicUrl(path);

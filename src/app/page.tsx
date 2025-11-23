@@ -51,12 +51,12 @@ export default function Home() {
                   <p style={{ color: 'rgba(255,255,255,0.95)', marginBottom: '1rem', fontSize: '0.95rem' }}>
                     Receba pagamentos pelo celular. Sem maquininha, sem complicação.
                   </p>
-                  <Link href="/motorista/cadastro" className="amo-btn" style={{
+                  <Link href="/motorista/login" className="amo-btn" style={{
                     background: 'white',
                     color: '#81C995',
                     fontWeight: '600'
                   }}>
-                    Cadastrar agora
+                    Começar agora
                   </Link>
                 </div>
 
@@ -278,7 +278,7 @@ export default function Home() {
           <p style={{ fontSize: '1.25rem', marginBottom: '2rem', opacity: 0.95 }}>
             Junte-se a milhares de profissionais que já usam AmoPagar
           </p>
-          <Link href="/motorista/cadastro" className="amo-btn" style={{
+          <Link href="/motorista/login" className="amo-btn" style={{
             background: 'white',
             color: '#8B7DD8',
             padding: '1rem 3rem',
@@ -312,7 +312,7 @@ export default function Home() {
               <h4 style={{ fontWeight: '600', marginBottom: '1rem' }}>Produto</h4>
               <ul style={{ listStyle: 'none', padding: 0 }}>
                 <li style={{ marginBottom: '0.5rem' }}>
-                  <Link href="/motorista/cadastro" style={{ color: '#9AA5B1', textDecoration: 'none' }}>Cadastro</Link>
+                  <Link href="/motorista/login" style={{ color: '#9AA5B1', textDecoration: 'none' }}>Login Motorista</Link>
                 </li>
                 <li style={{ marginBottom: '0.5rem' }}>
                   <Link href="/login" style={{ color: '#9AA5B1', textDecoration: 'none' }}>Login</Link>

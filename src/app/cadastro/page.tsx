@@ -461,12 +461,12 @@ export default function ClientSignUp() {
           </p>
           <p style={{ color: '#52606D' }}>
             É motorista?{' '}
-            <Link href="/motorista/cadastro" style={{
+            <Link href="/motorista/login" style={{
               color: '#81C995',
               fontWeight: '600',
               textDecoration: 'none'
             }}>
-              Cadastre-se aqui
+              Faça login aqui
             </Link>
           </p>
         </div>

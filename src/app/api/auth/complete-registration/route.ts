@@ -1,13 +1,35 @@
 // src/app/api/auth/complete-registration/route.ts
 import { NextResponse } from "next/server";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { cookies } from "next/headers";
 import {
-  createDriverWithPhone,
   formatPhoneNumber,
-  supabaseServer, // Import server client for storage and profile updates
+  supabaseServer,
 } from "@/lib/supabase/client";
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
+    console.log("=== complete-registration route called ===");
+
+    // Get authenticated user from session
+    const cookieStore = await cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      console.error("User not authenticated:", authError);
+      return NextResponse.json(
+        { error: "Você precisa verificar seu telefone primeiro." },
+        { status: 401 }
+      );
+    }
+
+    const userId = user.id;
+    console.log("Completing registration for user:", userId);
+
     const formData = await req.formData();
 
     // Extract form data
@@ -29,49 +51,11 @@ export async function POST(req: Request) {
       );
     }
 
-    // --- Prepare User Data for Creation ---
-    const userData: any = {
-      nome,
-      cpf,
-      profissao,
-      data_nascimento: dataNascimento,
-      // avatar_index: Number(avatarIndex), // We'll set avatar_url later
-    };
-    if (email && email.trim() !== "") userData.email = email.trim();
-
-    // --- Create User and Initial Profile --- 
-    // (createDriverWithPhone handles auth user creation and basic profile upsert)
     const formattedPhone = formatPhoneNumber(phone, countryCode);
-    const { data: creationData, error: creationError } = await createDriverWithPhone(
-      formattedPhone,
-      userData
-    );
 
-    if (creationError) {
-      console.error("Error during createDriverWithPhone:", creationError.message);
-      const msg = creationError.message;
-      // Map specific errors to user-friendly messages if needed
-      const userFriendlyError = 
-        msg === "phone_exists" ? "Este número de telefone já está cadastrado."
-        : msg === "email_exists" ? "Este email já está cadastrado."
-        : "Erro ao criar usuário.";
-      const status = msg === "phone_exists" || msg === "email_exists" ? 409 : 500;
-      return NextResponse.json({ error: userFriendlyError }, { status });
-    }
-
-    const userId = creationData?.user?.id;
-    if (!userId) {
-      console.error("User creation succeeded but no user ID returned.");
-      return NextResponse.json(
-        { error: "Falha ao obter ID do usuário após criação." },
-        { status: 500 }
-      );
-    }
-
-    // --- Handle Selfie Upload and Avatar URL --- 
+    // --- Handle Selfie Upload and Avatar URL ---
     let selfieUrl: string | null = null;
     let avatarUrl: string | null = null;
-    const updates: { selfie_url?: string; avatar_url?: string } = {};
 
     // 1. Upload Selfie
     if (selfieFile) {
@@ -82,16 +66,12 @@ export async function POST(req: Request) {
 
       if (uploadError) {
         console.error(`Error uploading selfie for user ${userId}:`, uploadError);
-        // Decide if this is a critical error. Maybe proceed without selfie?
-        // For now, we'll log it but continue.
+        // Proceed without selfie for now
       } else {
         const { data: urlData } = supabaseServer.storage
           .from("selfies")
           .getPublicUrl(selfiePath);
         selfieUrl = urlData?.publicUrl;
-        if (selfieUrl) {
-            updates.selfie_url = selfieUrl;
-        }
         console.log(`Selfie uploaded for ${userId} to ${selfieUrl}`);
       }
     }
@@ -100,28 +80,67 @@ export async function POST(req: Request) {
     const index = Number(avatarIndex);
     if (!isNaN(index) && index >= 0 && index < 9) { // Assuming 9 avatars (0-8)
       avatarUrl = `/images/avatars/avatar_${index + 1}.png`;
-      updates.avatar_url = avatarUrl;
       console.log(`Avatar URL set for ${userId} to ${avatarUrl}`);
     } else {
-        console.warn(`Invalid avatarIndex received: ${avatarIndex} for user ${userId}`);
+      console.warn(`Invalid avatarIndex received: ${avatarIndex} for user ${userId}`);
     }
 
-    // 3. Update Profile with URLs
-    if (Object.keys(updates).length > 0) {
-      const { error: updateError } = await supabaseServer
-        .from("profiles")
-        .update(updates)
-        .eq("id", userId);
+    // 3. Create or Update Profile
+    // Check if profile already exists (created by trigger or previous attempt)
+    const { data: existingProfile } = await supabaseServer
+      .from("profiles")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle();
 
-      if (updateError) {
-        console.error(`Error updating profile URLs for user ${userId}:`, updateError);
-        // Log error, but registration is mostly complete.
-      }
+    const profilePayload: any = {
+      id: userId,
+      celular: formattedPhone,
+      tipo: 'motorista',
+      nome,
+      cpf,
+      profissao,
+      data_nascimento: dataNascimento,
+      verified: true,
+      onboarding_completed: true, // Mark onboarding as complete
+      updated_at: new Date().toISOString(),
+    };
+
+    // Add optional fields
+    if (email && email.trim() !== "") profilePayload.email = email.trim();
+    if (selfieUrl) profilePayload.selfie_url = selfieUrl;
+    if (avatarUrl) profilePayload.avatar_url = avatarUrl;
+
+    // Use upsert to handle both creation and updates
+    const { error: profileError } = await supabaseServer
+      .from("profiles")
+      .upsert(profilePayload);
+
+    if (profileError) {
+      console.error(`Error creating/updating profile for user ${userId}:`, profileError);
+      return NextResponse.json(
+        { error: "Erro ao salvar perfil do motorista." },
+        { status: 500 }
+      );
     }
 
-    // --- Success --- 
+    // --- Success ---
     console.log(`Registration completed for user ${userId}`);
-    return NextResponse.json({ userId }, { status: 200 });
+
+    // Check if Stripe account is connected
+    const { data: stripeCheck } = await supabaseServer
+      .from("profiles")
+      .select("stripe_account_id")
+      .eq("id", userId)
+      .single();
+
+    const needsStripeOnboarding = !stripeCheck?.stripe_account_id;
+
+    return NextResponse.json({
+      userId,
+      needsStripeOnboarding,
+      redirectTo: needsStripeOnboarding ? '/motorista/stripe-onboarding' : '/motorista/dashboard'
+    }, { status: 200 });
 
   } catch (err: any) {
     console.error("Unhandled error in complete-registration:", err);

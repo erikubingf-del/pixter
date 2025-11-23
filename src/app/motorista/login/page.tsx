@@ -8,6 +8,7 @@ import '../../../styles/amopagar-theme.css';
 
 export default function MotoristaLogin() {
   const router = useRouter();
+  const [loginMethod, setLoginMethod] = useState<'phone' | 'email'>('phone');
   const [phone, setPhone] = useState("");
   const [countryCode] = useState("55");
   const [codeSent, setCodeSent] = useState(false);
@@ -16,6 +17,8 @@ export default function MotoristaLogin() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [otp, setOtp] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   // Countdown timer
   useEffect(() => {
@@ -108,7 +111,13 @@ export default function MotoristaLogin() {
           : result.error);
       }
 
-      if (result?.url) {
+      // Check if user needs onboarding
+      const checkOnboarding = await fetch('/api/motorista/check-onboarding');
+      const { needsOnboarding } = await checkOnboarding.json();
+
+      if (needsOnboarding) {
+        router.push("/motorista/cadastro");
+      } else if (result?.url) {
         router.push(result.url);
       } else {
         router.push("/motorista/dashboard");
@@ -122,6 +131,44 @@ export default function MotoristaLogin() {
   const handleOtpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, '').slice(0, 6);
     setOtp(value);
+  };
+
+  const handleEmailLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      return setError("Por favor, informe email e senha");
+    }
+    setLoading(true);
+    setError("");
+
+    try {
+      const result = await signIn("email-password", {
+        redirect: false,
+        email,
+        password,
+        callbackUrl: "/motorista/dashboard",
+      });
+
+      if (result?.error) {
+        throw new Error(result.error === "CredentialsSignin"
+          ? "Email ou senha incorretos"
+          : result.error);
+      }
+
+      // Check if user needs onboarding
+      const checkOnboarding = await fetch('/api/motorista/check-onboarding');
+      const { needsOnboarding } = await checkOnboarding.json();
+
+      if (needsOnboarding) {
+        router.push("/motorista/cadastro");
+      } else if (result?.url) {
+        router.push(result.url);
+      } else {
+        router.push("/motorista/dashboard");
+      }
+    } catch (err: any) {
+      setError(err.message);
+      setLoading(false);
+    }
   };
 
   return (
@@ -161,9 +208,60 @@ export default function MotoristaLogin() {
           <p style={{ color: '#52606D', fontSize: '0.95rem' }}>
             {codeSent
               ? 'Enviamos um código de 6 dígitos para seu WhatsApp'
-              : 'Entre com seu número de celular'}
+              : loginMethod === 'phone'
+              ? 'Entre com seu número de celular'
+              : 'Entre com seu email e senha'}
           </p>
         </div>
+
+        {/* Login Method Toggle */}
+        {!codeSent && (
+          <div style={{
+            display: 'flex',
+            gap: '0.5rem',
+            marginBottom: '1.5rem',
+            background: '#F7FAFC',
+            padding: '0.25rem',
+            borderRadius: 'var(--amo-radius-md)',
+          }}>
+            <button
+              type="button"
+              onClick={() => setLoginMethod('phone')}
+              style={{
+                flex: 1,
+                padding: '0.75rem',
+                border: 'none',
+                borderRadius: 'var(--amo-radius-sm)',
+                fontWeight: '600',
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                background: loginMethod === 'phone' ? '#81C995' : 'transparent',
+                color: loginMethod === 'phone' ? '#FFF' : '#52606D',
+              }}
+            >
+              📱 Telefone
+            </button>
+            <button
+              type="button"
+              onClick={() => setLoginMethod('email')}
+              style={{
+                flex: 1,
+                padding: '0.75rem',
+                border: 'none',
+                borderRadius: 'var(--amo-radius-sm)',
+                fontWeight: '600',
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                background: loginMethod === 'email' ? '#8B7DD8' : 'transparent',
+                color: loginMethod === 'email' ? '#FFF' : '#52606D',
+              }}
+            >
+              ✉️ Email
+            </button>
+          </div>
+        )}
 
         {/* Error Message */}
         {error && (
@@ -204,52 +302,121 @@ export default function MotoristaLogin() {
         )}
 
         {!codeSent ? (
-          // Phone Input Step
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div>
-              <label htmlFor="phone" style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: '#1F2933',
-                marginBottom: '0.5rem'
-              }}>
-                Número de Celular (WhatsApp)
-              </label>
-              <input
-                id="phone"
-                type="tel"
-                value={formatPhone(phone)}
-                onChange={handlePhoneChange}
-                placeholder="(11) 99999-9999"
-                className="amo-input"
-                autoFocus
-              />
-            </div>
+          loginMethod === 'phone' ? (
+            // Phone OTP Login
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div>
+                <label htmlFor="phone" style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#1F2933',
+                  marginBottom: '0.5rem'
+                }}>
+                  Número de Celular (WhatsApp)
+                </label>
+                <input
+                  id="phone"
+                  type="tel"
+                  value={formatPhone(phone)}
+                  onChange={handlePhoneChange}
+                  placeholder="(11) 99999-9999"
+                  className="amo-input"
+                  autoFocus
+                />
+              </div>
 
-            <button
-              onClick={enviarCodigo}
-              disabled={loading || phone.length < 10}
-              className="amo-btn amo-btn-secondary"
-              style={{ width: '100%' }}
-            >
-              {loading ? (
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                  <span style={{
-                    width: '16px',
-                    height: '16px',
-                    border: '2px solid rgba(255,255,255,0.3)',
-                    borderTop: '2px solid white',
-                    borderRadius: '50%',
-                    animation: 'spin 0.6s linear infinite'
-                  }}></span>
-                  Enviando...
-                </span>
-              ) : (
-                <>📱 Enviar código via WhatsApp</>
-              )}
-            </button>
-          </div>
+              <button
+                onClick={enviarCodigo}
+                disabled={loading || phone.length < 10}
+                className="amo-btn amo-btn-secondary"
+                style={{ width: '100%' }}
+              >
+                {loading ? (
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                    <span style={{
+                      width: '16px',
+                      height: '16px',
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      borderTop: '2px solid white',
+                      borderRadius: '50%',
+                      animation: 'spin 0.6s linear infinite'
+                    }}></span>
+                    Enviando...
+                  </span>
+                ) : (
+                  <>📱 Enviar código via WhatsApp</>
+                )}
+              </button>
+            </div>
+          ) : (
+            // Email/Password Login
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div>
+                <label htmlFor="email" style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#1F2933',
+                  marginBottom: '0.5rem'
+                }}>
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="seu@email.com"
+                  className="amo-input"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label htmlFor="password" style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: '#1F2933',
+                  marginBottom: '0.5rem'
+                }}>
+                  Senha
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="amo-input"
+                />
+              </div>
+
+              <button
+                onClick={handleEmailLogin}
+                disabled={loading || !email.trim() || !password.trim()}
+                className="amo-btn amo-btn-secondary"
+                style={{ width: '100%' }}
+              >
+                {loading ? (
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                    <span style={{
+                      width: '16px',
+                      height: '16px',
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      borderTop: '2px solid white',
+                      borderRadius: '50%',
+                      animation: 'spin 0.6s linear infinite'
+                    }}></span>
+                    Entrando...
+                  </span>
+                ) : (
+                  'Entrar'
+                )}
+              </button>
+            </div>
+          )
         ) : (
           // OTP Input Step
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -359,16 +526,6 @@ export default function MotoristaLogin() {
           alignItems: 'center',
           fontSize: '0.875rem'
         }}>
-          <p style={{ color: '#52606D' }}>
-            Não tem uma conta?{' '}
-            <Link href="/motorista/cadastro" style={{
-              color: '#81C995',
-              fontWeight: '600',
-              textDecoration: 'none'
-            }}>
-              Cadastre-se
-            </Link>
-          </p>
           <p style={{ color: '#52606D' }}>
             É cliente?{' '}
             <Link href="/login" style={{

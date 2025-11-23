@@ -23,14 +23,16 @@ export async function middleware(req: NextRequest) {
   --------------------------------------------------------------*/
   const { pathname } = req.nextUrl;
    
-  const isPublic = 
+  const isPublic =
     pathname.startsWith('/login') ||
     pathname.startsWith('/cadastro') ||
     pathname.startsWith('/public') ||
     pathname.startsWith('/api') ||
     pathname.startsWith('/motorista/login') ||
-    pathname.startsWith('/motorista/cadastro') ||
     pathname.startsWith('/images') ||
+    pathname.startsWith('/termos') ||
+    pathname.startsWith('/privacidade') ||
+    pathname.startsWith('/auth/callback') ||
     pathname === '/';
    
   const isAuthenticated = !!session;
@@ -58,9 +60,8 @@ export async function middleware(req: NextRequest) {
       pathname === '/login' || 
       pathname === '/cadastro';
     
-    const isMotoristaLoginPage = 
-      pathname === '/motorista/login' || 
-      pathname === '/motorista/cadastro';
+    const isMotoristaLoginPage =
+      pathname === '/motorista/login';
     
     // Get user type from session token
     const userType = session.tipo as string || 'cliente';

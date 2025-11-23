@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import QRCode from "qrcode";
 import { format, subDays } from "date-fns";
+import StripeSetupAlert from "@/components/StripeSetupAlert";
 // import { ptBR } from "date-fns/locale"; // Not used in the provided snippet, can be removed if not used elsewhere
 
 // Type for individual transaction/payment item
@@ -196,6 +197,9 @@ export default function DriverDashboardPage() {
       <h1 className="text-3xl font-bold text-gray-800">
         Olá, {profile.nome || "Motorista"}!
       </h1>
+
+      {/* Stripe Setup Alert */}
+      <StripeSetupAlert />
 
       {error && (
         <div className="p-4 text-red-500 bg-red-100 border border-red-300 rounded-md">
