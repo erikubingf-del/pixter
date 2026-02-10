@@ -1,53 +1,25 @@
 import { NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { safeErrorResponse } from '@/lib/utils/api-error';
 
-export async function POST(request: Request) {
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-
+/**
+ * POST /api/auth/signin-client
+ *
+ * This route is no longer needed since NextAuth handles email/password
+ * authentication via the credentials provider. Client login should use
+ * NextAuth's signIn("credentials", { email, password }) directly.
+ *
+ * Kept as a redirect/hint for any legacy frontend code that still calls this endpoint.
+ */
+export async function POST() {
   try {
-    const body = await request.json();
-    const { email, password } = body;
-
-    // Validation
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: 'Email e senha são obrigatórios' },
-        { status: 400 }
-      );
-    }
-
-    // Sign in the user
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-
-    if (error) {
-      console.error('Error signing in:', error);
-      // Provide a more generic error message for security
-      return NextResponse.json(
-        { error: 'Credenciais inválidas. Verifique seu email e senha.' },
-        { status: 401 } // Unauthorized
-      );
-    }
-
-    // Session is automatically handled by Auth Helpers middleware.
-    // Return success, no need to return the session object here.
-    return NextResponse.json({
-      success: true,
-      message: 'Login realizado com sucesso',
-      // Optionally return minimal user info if needed immediately
-      // user: { id: data.user.id, email: data.user.email }
-    });
-
-  } catch (error: any) {
-    console.error('Erro geral no signin-client:', error);
     return NextResponse.json(
-      { error: error.message || 'Erro interno no servidor' },
-      { status: 500 }
+      {
+        error: 'Use o login via NextAuth. Chame signIn("credentials", { email, password }) no frontend.',
+        redirect: '/api/auth/signin',
+      },
+      { status: 410 } // Gone
     );
+  } catch (error) {
+    return safeErrorResponse(error, 'Erro no signin-client');
   }
 }
-

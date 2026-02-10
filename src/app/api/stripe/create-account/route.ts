@@ -1,47 +1,26 @@
-// src/app/api/stripe/create-account/route.ts
 import { NextResponse } from "next/server";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
-import Stripe from "stripe";
+import stripe from "@/lib/stripe/server";
+import { requireAuth } from "@/lib/auth/get-session";
+import { supabaseServer } from "@/lib/supabase/client";
+import { safeErrorResponse } from "@/lib/utils/api-error";
 
 export const dynamic = 'force-dynamic';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2022-11-15",
-});
-
 export async function POST() {
   try {
-    const cookieStore = await cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const session = await requireAuth();
 
-    // Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "Não autenticado" },
-        { status: 401 }
-      );
-    }
-
-    // Get user profile
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await supabaseServer
       .from("profiles")
       .select("*")
-      .eq("id", user.id)
+      .eq("id", session.id)
       .single();
 
     if (profileError || !profile) {
-      return NextResponse.json(
-        { error: "Perfil não encontrado" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Perfil não encontrado" }, { status: 404 });
     }
 
-    // Check if user already has a Stripe account
     if (profile.stripe_account_id) {
-      // Get account link for existing account
       const accountLink = await stripe.accountLinks.create({
         account: profile.stripe_account_id,
         refresh_url: `${process.env.NEXT_PUBLIC_APP_URL}/motorista/stripe-onboarding`,
@@ -49,13 +28,9 @@ export async function POST() {
         type: 'account_onboarding',
       });
 
-      return NextResponse.json({
-        url: accountLink.url,
-        accountId: profile.stripe_account_id,
-      });
+      return NextResponse.json({ url: accountLink.url, accountId: profile.stripe_account_id });
     }
 
-    // Create new Stripe Connect account
     const account = await stripe.accounts.create({
       type: 'express',
       country: 'BR',
@@ -72,26 +47,20 @@ export async function POST() {
         phone: profile.celular || undefined,
       },
       metadata: {
-        user_id: user.id,
+        supabaseUserId: session.id,
         user_type: 'motorista',
       },
     });
 
-    // Save Stripe account ID to profile
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseServer
       .from("profiles")
-      .update({
-        stripe_account_id: account.id,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", user.id);
+      .update({ stripe_account_id: account.id, updated_at: new Date().toISOString() })
+      .eq("id", session.id);
 
     if (updateError) {
       console.error("Error updating profile with Stripe account:", updateError);
-      // Continue anyway - we can retry later
     }
 
-    // Create account link for onboarding
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
       refresh_url: `${process.env.NEXT_PUBLIC_APP_URL}/motorista/stripe-onboarding`,
@@ -99,16 +68,11 @@ export async function POST() {
       type: 'account_onboarding',
     });
 
-    return NextResponse.json({
-      url: accountLink.url,
-      accountId: account.id,
-    });
-
+    return NextResponse.json({ url: accountLink.url, accountId: account.id });
   } catch (error: any) {
-    console.error("Error creating Stripe account:", error);
-    return NextResponse.json(
-      { error: error.message || "Erro ao criar conta Stripe" },
-      { status: 500 }
-    );
+    if (error.name === 'AuthError') {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    return safeErrorResponse(error, "Erro ao criar conta Stripe");
   }
 }

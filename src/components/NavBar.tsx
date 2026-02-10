@@ -233,11 +233,18 @@ export default function NavBar() {
           icon: <CreditCard className="w-4 h-4 mr-2" />,
         },
         {
-          href: isStripeConnected ? driverPublicPageLink : "#",
-          text: "Minha Pagina de Pagamento",
+          href: "/motorista/lucro",
+          text: "Lucro",
+          icon: <CreditCard className="w-4 h-4 mr-2" />,
+        },
+        {
+          href: isStripeConnected
+            ? "/motorista/dashboard/pagina-pagamento"
+            : "/motorista/stripe-onboarding",
+          text: isStripeConnected
+            ? "Minha Página de Pagamento"
+            : "Conectar Stripe",
           icon: <ExternalLink className="w-4 h-4 mr-2" />,
-          // disabled: !isStripeConnected,
-      
         },
         {
           onClick: handleSignOut,

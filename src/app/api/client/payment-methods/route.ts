@@ -1,90 +1,128 @@
-import { NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
-import Stripe from 'stripe';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireCliente } from '@/lib/auth/get-session';
+import { supabaseServer } from '@/lib/supabase/client';
+import stripe from '@/lib/stripe/server';
+import { safeErrorResponse } from '@/lib/utils/api-error';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2022-11-15', // Use a recent stable API version
-});
-
-export async function GET(request: Request) {
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-
+export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    const session = await requireCliente();
+    const body = await request.json();
+    const { token } = body;
 
-    if (sessionError) {
-      console.error('Error getting session:', sessionError);
-      return NextResponse.json({ error: 'Erro interno ao verificar sessão' }, { status: 500 });
+    if (!token) {
+      return NextResponse.json({ error: 'Token do cartão é obrigatório' }, { status: 400 });
     }
 
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Não autorizado' },
-        { status: 401 }
-      );
-    }
-
-    const userId = session.user.id;
-
-    // Fetch user profile using the route handler client
-    const { data: profile, error: profileError } = await supabase
+    // Get or create Stripe customer
+    let { data: profile } = await supabaseServer
       .from('profiles')
-      .select('stripe_customer_id, default_payment_method') // Select only needed fields
-      .eq('id', userId)
+      .select('stripe_customer_id, email, nome')
+      .eq('id', session.id)
+      .single();
+
+    let customerId = profile?.stripe_customer_id;
+
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: session.email,
+        name: profile?.nome || session.name || undefined,
+        metadata: { supabaseUserId: session.id },
+      });
+      customerId = customer.id;
+
+      await supabaseServer
+        .from('profiles')
+        .update({ stripe_customer_id: customerId, updated_at: new Date().toISOString() })
+        .eq('id', session.id);
+    }
+
+    // Create payment method from token and attach to customer
+    const paymentMethod = await stripe.paymentMethods.create({
+      type: 'card',
+      card: { token },
+    });
+
+    await stripe.paymentMethods.attach(paymentMethod.id, {
+      customer: customerId,
+    });
+
+    // Set as default if it's the first card
+    const existing = await stripe.paymentMethods.list({
+      customer: customerId,
+      type: 'card',
+    });
+
+    if (existing.data.length === 1) {
+      await supabaseServer
+        .from('profiles')
+        .update({ default_payment_method: paymentMethod.id, updated_at: new Date().toISOString() })
+        .eq('id', session.id);
+    }
+
+    return NextResponse.json({
+      success: true,
+      paymentMethod: {
+        id: paymentMethod.id,
+        card_brand: paymentMethod.card?.brand,
+        last4: paymentMethod.card?.last4,
+        exp_month: paymentMethod.card?.exp_month,
+        exp_year: paymentMethod.card?.exp_year,
+      },
+    });
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === 'AuthError') {
+      return NextResponse.json({ error: error.message }, { status: 401 });
+    }
+    return safeErrorResponse(error, 'Erro ao adicionar cartão');
+  }
+}
+
+export async function GET() {
+  try {
+    const session = await requireCliente();
+
+    const { data: profile, error: profileError } = await supabaseServer
+      .from('profiles')
+      .select('stripe_customer_id, default_payment_method')
+      .eq('id', session.id)
       .single();
 
     if (profileError) {
-      console.error('Erro ao buscar perfil:', profileError);
-      // Distinguish between not found and other errors
-      if (profileError.code === 'PGRST116') { // PostgREST error code for 'relation does not exist or insufficient privilege'
+      if (profileError.code === 'PGRST116') {
         return NextResponse.json({ error: 'Perfil não encontrado' }, { status: 404 });
       }
-      return NextResponse.json({ error: 'Erro ao buscar perfil do usuário' }, { status: 500 });
+      return safeErrorResponse(profileError, 'Erro ao buscar perfil do usuário');
     }
 
     if (!profile) {
-        return NextResponse.json({ error: 'Perfil não encontrado' }, { status: 404 });
+      return NextResponse.json({ error: 'Perfil não encontrado' }, { status: 404 });
     }
 
-    // Check if the user has a Stripe customer ID
     const customerId = profile.stripe_customer_id;
-
     if (!customerId) {
-      // No Stripe customer ID means no saved payment methods
       return NextResponse.json({ paymentMethods: [] });
     }
 
-    // Fetch payment methods from Stripe
     const paymentMethods = await stripe.paymentMethods.list({
       customer: customerId,
       type: 'card',
     });
 
-    // Format the data to return only necessary fields
     const formattedPaymentMethods = paymentMethods.data.map(method => ({
       id: method.id,
       card_brand: method.card?.brand,
       last4: method.card?.last4,
       exp_month: method.card?.exp_month,
       exp_year: method.card?.exp_year,
-      is_default: method.id === profile.default_payment_method, // Check against profile's default
+      is_default: method.id === profile.default_payment_method,
     }));
 
     return NextResponse.json({ paymentMethods: formattedPaymentMethods });
-
   } catch (error: any) {
-    console.error('Erro ao buscar métodos de pagamento:', error);
-    // Check if it's a Stripe error
-    if (error.type && error.type.startsWith('Stripe')) {
-        return NextResponse.json({ error: `Erro do Stripe: ${error.message}` }, { status: 500 });
+    if (error.name === 'AuthError') {
+      return NextResponse.json({ error: error.message }, { status: error.status });
     }
-    return NextResponse.json(
-      { error: error.message || 'Erro interno no servidor ao buscar métodos de pagamento' },
-      { status: 500 }
-    );
+    return safeErrorResponse(error, 'Erro interno no servidor ao buscar métodos de pagamento');
   }
 }
-

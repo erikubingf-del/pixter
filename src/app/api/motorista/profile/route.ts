@@ -1,191 +1,141 @@
-// src/app/api/motorista/profile/route.ts
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth/options";
+import { requireMotorista } from "@/lib/auth/get-session";
 import { supabaseServer } from "@/lib/supabase/client";
+import { safeErrorResponse } from "@/lib/utils/api-error";
 
 export const dynamic = 'force-dynamic';
 
-
-// Define the list of valid avatar paths for validation
 const VALID_AVATAR_PATHS = Array.from({ length: 9 }, (_, i) => `/images/avatars/avatar_${i + 1}.png`);
 
-export async function GET(request: Request) {
-  // 1) Validate via NextAuth
-  const session = await getServerSession(authOptions);
-  if (!session || !session.user?.id) {
-    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  }
-  if (session.user.tipo !== "motorista") {
-    return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
-  }
+export async function GET() {
+  try {
+    const session = await requireMotorista();
+    const userId = session.id;
 
-  // 2) Fetch the profile from Supabase
-  const userId = session.user.id;
-  const { data: profile, error } = await supabaseServer
-    .from("profiles")
-    .select("id, nome, email, celular, tipo, profissao, stripe_account_id, stripe_account_status, avatar_url")
-    .eq("id", userId)
-    .eq("tipo", "motorista")
-    .single();
+    const { data: profile, error } = await supabaseServer
+      .from("profiles")
+      .select("id, nome, email, celular, tipo, profissao, stripe_account_id, stripe_account_status, avatar_url")
+      .eq("id", userId)
+      .eq("tipo", "motorista")
+      .single();
 
-  if (error) {
-    // If no profile exists yet, check by phone or email before creating
-    if (error.code === 'PGRST116') {
-      console.log("Profile not found by ID, checking by phone/email before creating");
-      
-      // Get phone number from user if available (added as custom field in NextAuth)
-      const userPhone = (session.user as any).phone || '';
-      
-      // First check if there's already a profile with the same email/phone
-      let existingProfile = null;
-      
-      if (session.user.email) {
-        const { data: emailProfile } = await supabaseServer
-          .from("profiles")
-          .select("*")
-          .eq("email", session.user.email)
-          .maybeSingle();
-          
-        if (emailProfile) {
-          console.log("Found existing profile by email:", emailProfile.id);
-          existingProfile = emailProfile;
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // Check by phone or email
+        let existingProfile = null;
+
+        if (session.email) {
+          const { data: emailProfile } = await supabaseServer
+            .from("profiles")
+            .select("*")
+            .eq("email", session.email)
+            .maybeSingle();
+          if (emailProfile) existingProfile = emailProfile;
         }
-      }
-      
-      // Check if profile exists by phone number
-      
-      if (!existingProfile && userPhone) {
-        // Get phone with and without plus for checking
-        const phoneWithPlus = userPhone.startsWith("+") ? userPhone : `+${userPhone}`;
-        const phoneWithoutPlus = userPhone.startsWith("+") ? userPhone.substring(1) : userPhone;
-        
-        const { data: phoneProfile } = await supabaseServer
-          .from("profiles")
-          .select("*")
-          .or(`celular.eq.${phoneWithPlus},celular.eq.${phoneWithoutPlus}`)
-          .maybeSingle();
-          
-        if (phoneProfile) {
-          console.log("Found existing profile by phone:", phoneProfile.id);
-          existingProfile = phoneProfile;
-        }
-      }
-      
-      // If we found an existing profile, just return it (no need to update IDs)
-      if (existingProfile) {
-        console.log("Found existing profile, returning it directly");
-        return NextResponse.json(existingProfile);
-      }
-      
-      // If no existing profile found, create a new one
-      console.log("No existing profile found, creating new one");
-      
-      const { data: newProfile, error: createError } = await supabaseServer
-        .from("profiles")
-        .insert({
-          id: userId,
-          tipo: "motorista",
-          nome: session.user.name || "Motorista",
-          email: session.user.email,
-          celular: userPhone, // Use properly typed variable
-          stripe_account_status: "unconnected"
-        })
-        .select()
-        .single();
 
-      if (createError) {
-        console.error("Erro ao criar perfil do motorista:", createError);
-        return NextResponse.json(
-          { error: "Erro ao criar perfil do motorista" },
-          { status: 500 }
-        );
+        if (!existingProfile && session.phone) {
+          const phoneWithPlus = session.phone.startsWith("+") ? session.phone : `+${session.phone}`;
+          const phoneWithoutPlus = session.phone.startsWith("+") ? session.phone.substring(1) : session.phone;
+
+          const { data: phoneProfile } = await supabaseServer
+            .from("profiles")
+            .select("*")
+            .in("celular", [phoneWithPlus, phoneWithoutPlus])
+            .maybeSingle();
+          if (phoneProfile) existingProfile = phoneProfile;
+        }
+
+        if (existingProfile) {
+          return NextResponse.json(existingProfile);
+        }
+
+        // Create new profile
+        const { data: newProfile, error: createError } = await supabaseServer
+          .from("profiles")
+          .insert({
+            id: userId,
+            tipo: "motorista",
+            nome: session.name || "Motorista",
+            email: session.email,
+            celular: session.phone || '',
+            stripe_account_status: "unconnected"
+          })
+          .select()
+          .single();
+
+        if (createError) {
+          return safeErrorResponse(createError, "Erro ao criar perfil do motorista");
+        }
+
+        return NextResponse.json(newProfile);
       }
-      
-      return NextResponse.json(newProfile);
+
+      return safeErrorResponse(error, "Erro ao buscar perfil do motorista");
     }
 
-    console.error("Erro ao buscar perfil do motorista:", error);
-    return NextResponse.json(
-      { error: "Erro ao buscar perfil do motorista" },
-      { status: 500 }
-    );
+    return NextResponse.json(profile);
+  } catch (error: any) {
+    if (error.name === 'AuthError') {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    return safeErrorResponse(error, "Erro interno");
   }
-
-  // 3) Return it
-  return NextResponse.json(profile);
 }
 
-// PUT handler to update the driver’s info
 export async function PUT(request: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session || !session.user?.id) {
-    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-  }
-  if (session.user.tipo !== "motorista") {
-    return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
-  }
-
-  const userId = session.user.id;
-  let updates: { [key: string]: any };
   try {
+    const session = await requireMotorista();
+    const userId = session.id;
+
+    let updates: { [key: string]: any };
+    try {
       updates = await request.json();
-  } catch (e) {
+    } catch {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+    }
 
-  // Sanitize/validate updates
-  const allowedUpdates: { [key: string]: any } = {};
-  if (updates.hasOwnProperty("nome")) {
+    const allowedUpdates: { [key: string]: any } = {};
+
+    if (updates.hasOwnProperty("nome")) {
       allowedUpdates.nome = updates.nome;
-  }
-  if (updates.hasOwnProperty("profissao")) {
+    }
+    if (updates.hasOwnProperty("profissao")) {
       allowedUpdates.profissao = updates.profissao;
-  }
-  // Validate and add avatar_url if present
-  if (updates.hasOwnProperty("avatar_url")) {
-      console.log(`Updating avatar_url for user ${userId} to: ${updates.avatar_url}`);
-      
+    }
+    if (updates.hasOwnProperty("avatar_url")) {
       if (updates.avatar_url === null || VALID_AVATAR_PATHS.includes(updates.avatar_url)) {
-          allowedUpdates.avatar_url = updates.avatar_url;
-          console.log(`Avatar update validated and accepted: ${updates.avatar_url}`);
+        allowedUpdates.avatar_url = updates.avatar_url;
+      } else if (typeof updates.avatar_url === 'string' && updates.avatar_url.startsWith('http')) {
+        // Accept Supabase storage URLs (uploaded avatars)
+        allowedUpdates.avatar_url = updates.avatar_url;
       } else {
-          console.warn(`Invalid avatar_url provided: ${updates.avatar_url}`);
-          // Still accept the avatar URL but log a warning
-          // This helps in case the static paths were updated but validation list wasn't
-          allowedUpdates.avatar_url = updates.avatar_url;
+        return NextResponse.json({ error: "URL de avatar inválida." }, { status: 400 });
       }
-  }
+    }
 
-  // Ensure there are updates to perform
-  if (Object.keys(allowedUpdates).length === 0) {
+    if (Object.keys(allowedUpdates).length === 0) {
       return NextResponse.json({ error: "Nenhum campo válido para atualização fornecido." }, { status: 400 });
+    }
+
+    allowedUpdates.updated_at = new Date().toISOString();
+
+    const { data, error } = await supabaseServer
+      .from("profiles")
+      .update(allowedUpdates)
+      .eq("id", userId)
+      .eq("tipo", "motorista")
+      .select("id, nome, email, celular, tipo, profissao, stripe_account_id, stripe_account_status, avatar_url")
+      .single();
+
+    if (error) {
+      return safeErrorResponse(error, "Erro ao atualizar perfil do motorista");
+    }
+
+    return NextResponse.json({ success: true, message: "Perfil atualizado com sucesso", profile: data });
+  } catch (error: any) {
+    if (error.name === 'AuthError') {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    return safeErrorResponse(error, "Erro interno");
   }
-
-  allowedUpdates.updated_at = new Date().toISOString();
-
-  const { data, error } = await supabaseServer
-    .from("profiles")
-    .update(allowedUpdates)
-    .eq("id", userId)
-    .eq("tipo", "motorista")
-    .select("id, nome, email, celular, tipo, profissao, stripe_account_id, stripe_account_status, avatar_url") // Return updated profile
-    .single();
-
-  if (error) {
-    console.error("Erro ao atualizar perfil do motorista:", error);
-    return NextResponse.json(
-      { error: "Erro ao atualizar perfil do motorista" },
-      { status: 500 }
-    );
-  }
-
-  console.log(`Profile updated successfully for ${userId}:`, data);
-  
-  return NextResponse.json({
-    success: true,
-    message: "Perfil atualizado com sucesso",
-    profile: data, // Return the updated profile data
-  });
 }
-

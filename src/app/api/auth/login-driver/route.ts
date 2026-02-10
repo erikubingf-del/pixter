@@ -1,108 +1,68 @@
-// src/app/api/auth/login-driver/route.ts (Updated for Supabase Built-in OTP & Auth Helpers)
-import { NextResponse } from "next/server";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
-import {
-  formatPhoneNumber,
-  supabaseAdmin // Use admin client for profile check for robustness
-} from "@/lib/supabase/client";
+import { NextResponse } from 'next/server';
+import { formatPhoneNumber, supabaseAdmin } from '@/lib/supabase/client';
+import { safeErrorResponse } from '@/lib/utils/api-error';
 
+/**
+ * POST /api/auth/login-driver
+ * Sends OTP to driver's phone via Supabase Auth.
+ * The actual session is created via NextAuth's phone-otp credentials provider
+ * after the OTP is verified on the client side.
+ *
+ * This route is public (no auth required) since the driver is logging in.
+ */
 export async function POST(request: Request) {
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-
   try {
     const body = await request.json();
-    const { phone, code, countryCode = "55" } = body;
+    const { phone, countryCode = '55' } = body;
 
-    // 1. Validation
-    if (!phone || !code) {
+    if (!phone) {
       return NextResponse.json(
-        { error: "Número de telefone e código são obrigatórios" },
+        { error: 'Número de telefone é obrigatório' },
         { status: 400 }
       );
     }
 
-    // 2. Format Phone Number
     const formattedPhone = formatPhoneNumber(phone, countryCode);
 
-    // 3. Verify OTP using Supabase Auth (Creates Session on Success)
-    const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
-      phone: formattedPhone,
-      token: code,
-      type: "sms", // or "whatsapp" if configured
-    });
+    // Verify this phone belongs to a motorista before sending OTP
+    const { data: profileData, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('tipo')
+      .eq('celular', formattedPhone)
+      .single();
 
-    if (otpError) {
-      console.error("Supabase verifyOtp error:", otpError.message);
-      // Map common errors to user-friendly messages
-      let errorMessage = "Código inválido ou expirado";
-      if (otpError.message.includes("expired")) {
-          errorMessage = "Código expirado. Por favor, solicite um novo.";
-      }
+    if (profileError || !profileData) {
       return NextResponse.json(
-        { error: errorMessage },
-        { status: 401 } // Unauthorized
+        { error: 'Nenhum motorista encontrado com este número.' },
+        { status: 404 }
       );
     }
 
-    // Check if session and user are returned (verification successful)
-    if (!otpData.session || !otpData.user) {
-        console.error("Supabase verifyOtp succeeded but did not return session/user.");
-        return NextResponse.json(
-            { error: "Falha ao verificar o código. Tente novamente." },
-            { status: 500 }
-        );
+    if (profileData.tipo?.toLowerCase() !== 'motorista') {
+      return NextResponse.json(
+        { error: 'Este número não pertence a um motorista.' },
+        { status: 403 }
+      );
     }
 
-    // 4. Verification successful, user is logged in. Now check if they are a motorista.
-    const userId = otpData.user.id;
-
-    // Use supabaseAdmin for a reliable check, bypassing RLS if needed
-    const { data: profileData, error: profileError } = await supabaseAdmin
-      .from("profiles")
-      .select("tipo") // Only select the type
-      .eq("id", userId)
-      .single();
-
-    if (profileError) {
-        console.error("Error fetching profile for user:", userId, profileError.message);
-        // Log out the user if profile check fails
-        await supabase.auth.signOut(); // Use the route handler client to sign out
-        return NextResponse.json(
-            { error: "Erro ao buscar perfil do motorista." },
-            { status: 500 }
-        );
-    }
-
-    if (!profileData || profileData.tipo?.toLowerCase() !== "motorista") {
-        console.log("User is not a motorista or profile missing. Type:", profileData?.tipo);
-        // Log out the user as they shouldn't access the driver section
-        await supabase.auth.signOut(); // Use the route handler client to sign out
-        return NextResponse.json(
-            { error: "Acesso não autorizado. Este usuário não é um motorista." },
-            { status: 403 } // Forbidden
-        );
-    }
-
-    // 5. Success: Code verified, session created, user is a motorista
-    console.log("Motorista login successful for user:", userId);
-    // The session is automatically handled by the Auth Helpers middleware and client.
-    // Return success and potentially user info (but not the session object itself from here).
-    return NextResponse.json({
-      success: true,
-      message: "Login realizado com sucesso!",
-      userId: userId,
-      // You might return minimal user details if needed by the frontend immediately
-      // user: { id: otpData.user.id, email: otpData.user.email, phone: otpData.user.phone, tipo: 'motorista' }
+    // Send OTP via Supabase Auth
+    const { error: otpError } = await supabaseAdmin.auth.signInWithOtp({
+      phone: formattedPhone,
     });
 
-  } catch (error: any) {
-    console.error("Erro geral no login-driver:", error);
-    return NextResponse.json(
-      { error: error.message || "Erro interno no servidor" },
-      { status: 500 }
-    );
+    if (otpError) {
+      console.error('Supabase OTP send error:', otpError.message);
+      return NextResponse.json(
+        { error: 'Falha ao enviar código de verificação. Tente novamente.' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Código de verificação enviado!',
+    });
+  } catch (error) {
+    return safeErrorResponse(error, 'Erro ao processar login do motorista');
   }
 }
-

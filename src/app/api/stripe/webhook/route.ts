@@ -1,133 +1,105 @@
-// src/app/api/stripe/webhook/route.ts
 import { NextResponse } from "next/server";
-import { Stripe } from "stripe";
-import { supabaseServer } from "@/lib/supabase/client"; // Use Service Role Key
-import { rateLimit } from "@/middleware/rate-limit";
+import stripe from "@/lib/stripe/server";
+import { supabaseServer } from "@/lib/supabase/client";
 
-// Initialize Stripe (Use environment variables!)
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_YOUR_KEY", {
-  apiVersion: "2022-11-15",
-});
-
-// Get the webhook secret from environment variables
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "whsec_YOUR_SECRET";
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 export async function POST(request: Request) {
-  // Rate limiting: Max 100 webhook calls per minute (prevents spam/replay attacks)
-  // More lenient than other endpoints since Stripe webhooks are authenticated
-  const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'stripe-webhook'
-  const rateLimitResult = rateLimit(`webhook:${ip}`, 100, 60000)
-
-  if (!rateLimitResult.success) {
-    console.error('Webhook rate limit exceeded from IP:', ip)
-    return NextResponse.json(
-      { error: 'Too many webhook requests' },
-      { status: 429 }
-    )
+  if (!webhookSecret) {
+    console.error("STRIPE_WEBHOOK_SECRET not configured");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
   }
 
   const payload = await request.text();
   const signature = request.headers.get("stripe-signature") || "";
 
-  let event: Stripe.Event;
-
-  // 1. Verify webhook signature
+  let event;
   try {
     event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
-    console.log("Webhook event received:", event.type);
   } catch (err: any) {
-    console.error(`Webhook signature verification failed: ${err.message}`);
-    return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
+    console.error("Webhook signature verification failed:", err.message);
+    return NextResponse.json({ error: "Webhook signature invalid" }, { status: 400 });
   }
 
-  // 2. Handle the event
+  // Always return 200 to prevent Stripe retries for non-retryable errors
   try {
     switch (event.type) {
       case "payment_intent.succeeded":
-        const paymentIntent = event.data.object as Stripe.PaymentIntent;
-        console.log(`Handling payment_intent.succeeded: ${paymentIntent.id}`);
-        await handlePaymentIntentSucceeded(paymentIntent);
+        await handlePaymentIntentSucceeded(event.data.object as any);
+        break;
+
+      case "payment_intent.payment_failed":
+        await handlePaymentIntentFailed(event.data.object as any);
+        break;
+
+      case "charge.dispute.created":
+        await handleDisputeCreated(event.data.object as any);
+        break;
+
+      case "charge.refunded":
+        await handleChargeRefunded(event.data.object as any);
         break;
 
       case "account.updated":
-        const account = event.data.object as Stripe.Account;
-        console.log(`Handling account.updated: ${account.id}`);
-        await handleAccountUpdated(account);
+        await handleAccountUpdated(event.data.object as any);
         break;
 
-      // Add other event types you want to handle here
-      // e.g., payment_intent.payment_failed, charge.dispute.created, etc.
-
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        break;
     }
-
-    // Return a 200 response to acknowledge receipt of the event
-    return NextResponse.json({ received: true });
-
-  } catch (error: any) {
-    console.error("Error processing webhook event:", error);
-    return NextResponse.json(
-      { error: "Webhook processing error." },
-      { status: 500 }
-    );
+  } catch (error) {
+    console.error(`Error processing webhook event ${event.type}:`, error);
+    // Still return 200 to prevent retries
   }
+
+  return NextResponse.json({ received: true });
 }
 
-// --- Handler Functions ---
-
-async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
+async function handlePaymentIntentSucceeded(paymentIntent: any) {
   const { id, amount, metadata, currency, status, latest_charge } = paymentIntent;
   const driverId = metadata?.driverId;
   const applicationFee = metadata?.applicationFee ? parseInt(metadata.applicationFee) : 0;
 
   if (!driverId) {
     console.error("Missing driverId in PaymentIntent metadata:", id);
-    return; // Cannot link payment without driver ID
+    return;
   }
 
   try {
-    // Get charge details for payment method and receipt
-    // latest_charge can be a string ID or expanded Charge object
     let chargeId: string | null = null;
     let paymentMethodType: string | null = null;
     let receiptUrl: string | null = null;
 
     if (latest_charge) {
       if (typeof latest_charge === 'string') {
-        // If it's just an ID, fetch the charge details
         const charge = await stripe.charges.retrieve(latest_charge);
         chargeId = charge.id;
         paymentMethodType = charge.payment_method_details?.type || null;
         receiptUrl = charge.receipt_url || null;
       } else {
-        // If it's expanded, use it directly
         chargeId = latest_charge.id;
         paymentMethodType = latest_charge.payment_method_details?.type || null;
         receiptUrl = latest_charge.receipt_url || null;
       }
     }
 
-    // Calculate net amount (amount minus application fee)
-    const netAmount = (amount - applicationFee) / 100; // Convert to BRL
-    const valorTotal = amount / 100; // Total amount in BRL
-    const feeAmount = applicationFee / 100; // Fee in BRL
+    // Store amounts in cents (no division by 100)
+    const netAmount = amount - applicationFee;
 
-    // Generate a unique receipt number for manual entry
-    const receiptNumber = `AMO-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    // Deterministic receipt number from payment ID (idempotent)
+    const receiptNumber = `AMO-${id.replace('pi_', '').substring(0, 12).toUpperCase()}`;
 
-    // Upsert payment record
     const { error: upsertError } = await supabaseServer
       .from("pagamentos")
       .upsert({
         stripe_payment_id: id,
         stripe_charge_id: chargeId,
         motorista_id: driverId,
-        valor: valorTotal,
+        valor: amount,
         moeda: currency,
         status: status,
         metodo: paymentMethodType,
-        application_fee_amount: feeAmount,
+        application_fee_amount: applicationFee,
         net_amount: netAmount,
         receipt_url: receiptUrl,
         receipt_number: receiptNumber,
@@ -137,65 +109,116 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
         },
         created_at: new Date(paymentIntent.created * 1000).toISOString(),
         updated_at: new Date().toISOString(),
+        // Link to authenticated client if available
+        ...(metadata?.clienteId ? { cliente_id: metadata.clienteId } : {}),
       }, { onConflict: "stripe_payment_id" });
 
     if (upsertError) {
       console.error("Error upserting payment record:", upsertError.message);
-    } else {
-      console.log(`Payment recorded: ${id} - Driver: ${driverId} - Amount: R$ ${valorTotal} - Net: R$ ${netAmount}`);
-
-      // Generate receipt PDF asynchronously (don't block webhook response)
-      fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/receipts/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paymentId: id }),
-      }).catch(err => console.error('Error triggering receipt generation:', err));
-
-      // TODO: Send notification to driver (email/SMS/push)
-      // TODO: Send receipt to client if cliente_id is available
     }
-
   } catch (error) {
     console.error("Exception in handlePaymentIntentSucceeded:", error);
   }
 }
 
+async function handlePaymentIntentFailed(paymentIntent: any) {
+  const { id } = paymentIntent;
+  try {
+    const { error } = await supabaseServer
+      .from("pagamentos")
+      .update({ status: 'failed', updated_at: new Date().toISOString() })
+      .eq("stripe_payment_id", id);
 
-async function handleAccountUpdated(account: Stripe.Account) {
+    if (error) {
+      console.error("Error updating failed payment:", error.message);
+    }
+  } catch (error) {
+    console.error("Exception in handlePaymentIntentFailed:", error);
+  }
+}
+
+async function handleDisputeCreated(dispute: any) {
+  const chargeId = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge?.id;
+  if (!chargeId) return;
+
+  try {
+    // Get existing payment to merge metadata
+    const { data: existing } = await supabaseServer
+      .from("pagamentos")
+      .select("metadata")
+      .eq("stripe_charge_id", chargeId)
+      .single();
+
+    const existingMeta = existing?.metadata || {};
+
+    const { error } = await supabaseServer
+      .from("pagamentos")
+      .update({
+        status: 'disputed',
+        updated_at: new Date().toISOString(),
+        metadata: {
+          ...existingMeta,
+          dispute_id: dispute.id,
+          dispute_reason: dispute.reason,
+          dispute_amount: dispute.amount,
+          dispute_created: new Date(dispute.created * 1000).toISOString(),
+          dispute_status: dispute.status,
+        },
+      })
+      .eq("stripe_charge_id", chargeId);
+
+    if (error) {
+      console.error("Error updating disputed payment:", error.message);
+    }
+  } catch (error) {
+    console.error("Exception in handleDisputeCreated:", error);
+  }
+}
+
+async function handleChargeRefunded(charge: any) {
+  try {
+    const { error } = await supabaseServer
+      .from("pagamentos")
+      .update({ status: 'refunded', updated_at: new Date().toISOString() })
+      .eq("stripe_charge_id", charge.id);
+
+    if (error) {
+      console.error("Error updating refunded payment:", error.message);
+    }
+  } catch (error) {
+    console.error("Exception in handleChargeRefunded:", error);
+  }
+}
+
+async function handleAccountUpdated(account: any) {
   const { id, metadata, charges_enabled, details_submitted, payouts_enabled } = account;
-  const supabaseUserId = metadata?.supabaseUserId; // Get Supabase user ID from metadata
+  const supabaseUserId = metadata?.supabaseUserId;
 
   if (!supabaseUserId) {
     console.error("Missing supabaseUserId in Stripe Account metadata:", id);
-    return; // Cannot link account update without the user ID
+    return;
   }
 
   try {
-    // Determine a simplified status based on Stripe flags
     let accountStatus = "pending";
     if (details_submitted) {
       accountStatus = charges_enabled && payouts_enabled ? "verified" : "restricted";
     }
 
-    // Update the corresponding profile in Supabase
     const { error: updateError } = await supabaseServer
       .from("profiles")
       .update({
-        // Store individual flags or a combined status
         stripe_account_charges_enabled: charges_enabled,
         stripe_account_details_submitted: details_submitted,
         stripe_account_payouts_enabled: payouts_enabled,
-        stripe_account_status: accountStatus, // Store the simplified status
+        stripe_account_status: accountStatus,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", supabaseUserId); // Use the ID from metadata
+      .eq("id", supabaseUserId);
 
     if (updateError) {
-      console.error("Error updating profile from account.updated webhook:", updateError.message);
-    } else {
-      console.log("Profile updated successfully for Stripe account:", id, "User:", supabaseUserId);
+      console.error("Error updating profile from account.updated:", updateError.message);
     }
-
   } catch (error) {
     console.error("Exception in handleAccountUpdated:", error);
   }

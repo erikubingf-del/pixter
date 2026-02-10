@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     const { valor, motorista_id, pagador_info } = body
 
     // Rate limiting: Max 20 Pix QR generations per driver per minute
-    const rateLimitResult = rateLimit(`pix-pending:${motorista_id}`, 20, 60000)
+    const rateLimitResult = await rateLimit(`pix-pending:${motorista_id}`, 20, 60000)
 
     if (!rateLimitResult.success) {
       return NextResponse.json(

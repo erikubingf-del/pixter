@@ -25,11 +25,11 @@ type Profile = {
   nome?: string
   avatar_url?: string
   celular?: string
-  cpf?: string
   company_name?: string
   city?: string
   pix_key?: string
-  stripe_account_id?: string
+  has_stripe?: boolean
+  has_pix?: boolean
 }
 
 function formatDisplayPhoneNumber(e164Phone?: string): string {
@@ -80,29 +80,32 @@ export default function PaginaPagamento() {
     fetchDriver()
   }, [driverIdentifier])
 
-  // Create PaymentIntent
+  // Create PaymentIntent with minimum amount (will be updated before confirmation)
+  // Only needed when driver accepts card payments via Stripe
   useEffect(() => {
     async function createIntent() {
-      if (!profile?.id) return
+      if (!profile?.id || !profile?.celular) return
+      if (!profile.has_stripe) {
+        // Driver only accepts Pix — no Stripe PaymentIntent needed
+        setLoadingIntent(false)
+        return
+      }
       try {
         setLoadingIntent(true)
         setError(null)
-        const res = await fetch(
-          `/api/stripe/create-payment-intent?driverId=${profile.id}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({}),
-            credentials: "include",
-          }
-        )
+        const res = await fetch("/api/stripe/create-payment-intent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: 200, // R$2.00 minimum, will be updated before confirmation
+            driverPhoneNumber: profile.celular.replace(/\D/g, ""),
+          }),
+          credentials: "include",
+        })
         const json = await res.json()
         if (!res.ok) throw new Error(json.error || `Erro ${res.status}: ${res.statusText}`)
         setClientSecret(json.clientSecret)
         setPaymentIntentId(json.paymentIntentId)
-        if (json.ephemeralKeySecret) {
-          setEphemeralKeySecret(json.ephemeralKeySecret)
-        }
       } catch (err: any) {
         console.error("Erro criando PaymentIntent:", err)
         setError(err.message)
@@ -205,15 +208,30 @@ export default function PaginaPagamento() {
     )
   }
 
-  if (!profile || !clientSecret || !paymentIntentId) {
+  if (!profile) {
     return null
   }
 
-  const options: StripeElementsOptions = {
-    clientSecret,
-    appearance: { theme: "stripe" },
-    ...(ephemeralKeySecret && { customerId: session?.user?.id, ephemeralKeySecret }),
+  // For Stripe card payments we need clientSecret; for Pix-only we don't
+  const needsStripe = profile.has_stripe
+  if (needsStripe && (!clientSecret || !paymentIntentId)) {
+    return null
   }
+
+  const options: StripeElementsOptions | undefined = clientSecret
+    ? {
+        clientSecret,
+        appearance: { theme: "stripe" },
+        ...(ephemeralKeySecret && { customerId: session?.user?.id, ephemeralKeySecret }),
+      }
+    : undefined
+
+  const paymentForm = (
+    <CheckoutForm
+      paymentIntentId={paymentIntentId}
+      profile={profile}
+    />
+  )
 
   return (
     <main style={{
@@ -283,9 +301,6 @@ export default function PaginaPagamento() {
                 {profile.celular && (
                   <span>{formatDisplayPhoneNumber(profile.celular)}</span>
                 )}
-                {profile.cpf && (
-                  <span>CPF: {profile.cpf}</span>
-                )}
               </div>
             </div>
           </div>
@@ -293,12 +308,13 @@ export default function PaginaPagamento() {
 
         {/* Payment Form Card */}
         <div className="amo-card amo-fade-in">
-          <Elements stripe={stripePromise} options={options}>
-            <CheckoutForm
-              paymentIntentId={paymentIntentId}
-              profile={profile}
-            />
-          </Elements>
+          {options ? (
+            <Elements stripe={stripePromise} options={options}>
+              {paymentForm}
+            </Elements>
+          ) : (
+            paymentForm
+          )}
         </div>
       </div>
     </main>
@@ -311,7 +327,7 @@ function CheckoutForm({
   paymentIntentId,
   profile
 }: {
-  paymentIntentId: string
+  paymentIntentId: string | null
   profile: Profile
 }) {
   const stripe = useStripe()
@@ -325,8 +341,8 @@ function CheckoutForm({
   const [error, setError] = useState<string | null>(null)
 
   // Determine available payment methods
-  const hasPixKey = !!profile.pix_key
-  const hasStripe = !!profile.stripe_account_id
+  const hasPixKey = !!profile.has_pix
+  const hasStripe = !!profile.has_stripe
 
   // Default to Pix if available, otherwise Card
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
@@ -450,12 +466,13 @@ function CheckoutForm({
         }
 
         // Confirm the payment
+        const vendorName = encodeURIComponent(profile.nome || 'Vendedor')
         const { error: stripeError } = await stripe.confirmPayment({
           elements,
           confirmParams: {
             return_url:
               typeof window !== "undefined"
-                ? `${window.location.origin}/pagamento/sucesso?driverId=${driverIdentifier}`
+                ? `${window.location.origin}/pagamento/sucesso?amount=${amountInCents}&vendor=${vendorName}`
                 : undefined,
           },
         })
@@ -665,6 +682,16 @@ function CheckoutForm({
             ⚠️ {amountError}
           </p>
         )}
+        {paymentMethod === 'card' && (
+          <p style={{
+            textAlign: 'center',
+            fontSize: '0.75rem',
+            color: '#9AA5B1',
+            marginTop: '0.25rem'
+          }}>
+            Mínimo R$ 2,00 · Máximo R$ 400,00
+          </p>
+        )}
       </div>
 
       {/* Payment Method Toggle - Only show if both methods available */}
@@ -750,8 +777,28 @@ function CheckoutForm({
             color: '#1F2933',
             marginBottom: '0.75rem'
           }}>
-            {hasPixKey && hasStripe ? 'Dados do Cartão' : 'Forma de Pagamento'}
+            {hasPixKey && hasStripe ? 'Cartão, Apple Pay ou Google Pay' : 'Forma de Pagamento'}
           </label>
+          <div style={{
+            background: '#F5F3FF',
+            borderRadius: 'var(--amo-radius-md)',
+            padding: '1rem',
+            border: '2px solid #DDD6FE',
+            marginBottom: '0.75rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem'
+          }}>
+            <span style={{ fontSize: '1.5rem' }}>🔒</span>
+            <div>
+              <p style={{ fontSize: '0.875rem', color: '#5B21B6', fontWeight: '600', marginBottom: '0.15rem' }}>
+                Pagamento seguro via Stripe
+              </p>
+              <p style={{ fontSize: '0.75rem', color: '#7C3AED' }}>
+                Apple Pay, Google Pay ou cartão de crédito/débito
+              </p>
+            </div>
+          </div>
           <PaymentElement id="payment-element" options={{ layout: "tabs" }} />
         </div>
       ) : (

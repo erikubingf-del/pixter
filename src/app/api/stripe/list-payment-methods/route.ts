@@ -1,36 +1,24 @@
-// src/app/api/stripe/list-payment-methods/route.ts
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth/options"; // Adjust path as needed
-import { Stripe } from "stripe";
+import { requireAuth } from "@/lib/auth/get-session";
+import stripe from "@/lib/stripe/server";
+import { safeErrorResponse } from "@/lib/utils/api-error";
 
 export const dynamic = 'force-dynamic';
 
-
-// Initialize Stripe (Use environment variables!)
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_YOUR_KEY", {
-  apiVersion: "2022-11-15", // Use your desired API version
-});
-
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    // 1. Get session and Stripe Customer ID
-    const session = await getServerSession(authOptions);
+    const session = await requireAuth();
+    const stripeCustomerId = (session as any)?.stripeCustomerId;
 
-    // Type assertion to access custom properties
-    const stripeCustomerId = (session?.user as any)?.stripeCustomerId;
-
-    if (!session || !stripeCustomerId) {
-      return NextResponse.json({ error: "Usuário não autenticado ou não encontrado." }, { status: 401 });
+    if (!stripeCustomerId) {
+      return NextResponse.json({ error: "Usuário não possui conta de cliente Stripe." }, { status: 404 });
     }
 
-    // 2. List payment methods from Stripe
     const paymentMethods = await stripe.paymentMethods.list({
       customer: stripeCustomerId,
       type: "card",
     });
 
-    // 3. Format the response (only send necessary, non-sensitive data)
     const formattedPaymentMethods = paymentMethods.data.map((pm) => ({
       id: pm.id,
       brand: pm.card?.brand,
@@ -40,13 +28,10 @@ export async function GET(request: Request) {
     }));
 
     return NextResponse.json(formattedPaymentMethods);
-
   } catch (error: any) {
-    console.error("List Payment Methods error:", error);
-    return NextResponse.json(
-      { error: error.message || "Falha ao buscar métodos de pagamento." },
-      { status: 500 }
-    );
+    if (error.name === 'AuthError') {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    return safeErrorResponse(error, "Falha ao buscar métodos de pagamento.");
   }
 }
-

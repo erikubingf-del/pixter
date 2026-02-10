@@ -41,7 +41,7 @@ export default function StripeOnboarding() {
     setError('');
 
     try {
-      const res = await fetch('/api/stripe/create-account', {
+      const res = await fetch('/api/stripe/connect-account', {
         method: 'POST',
       });
 

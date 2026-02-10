@@ -200,7 +200,7 @@ export default function DriverPaymentPage({
     setPaymentDetails(pi);
 
     // Redirect to success page with payment details for post-payment signup
-    const vendorName = profile?.nome || 'Vendedor'
+    const vendorName = driverInfo?.profile?.nome || 'Vendedor'
     const amountInCents = parseInt(rawAmountDigits || "0", 10)
 
     const params = new URLSearchParams({
@@ -239,10 +239,13 @@ export default function DriverPaymentPage({
   // Now we can safely access driverInfo.profile properties
   const profile = driverInfo.profile;
 
+  // Check if merchant can receive payments
+  const canReceivePayments = driverInfo.has_stripe === true;
+
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <main className="flex-grow flex flex-col items-center p-4 pt-8 md:pt-16">
-        
+
           <div className="flex justify-end w-full mt-2 mb-4">
             <div className="space-x-4">
               {!data ? (
@@ -383,8 +386,23 @@ export default function DriverPaymentPage({
             )}
           </div>
 
-          {/* amount input and payment flow */}
-          {!paymentSuccess ? (
+          {/* Check if merchant can receive payments */}
+          {!canReceivePayments ? (
+            <div className="text-center py-8 space-y-4">
+              <div className="w-16 h-16 mx-auto bg-yellow-100 rounded-full flex items-center justify-center">
+                <span className="text-2xl">⚠️</span>
+              </div>
+              <h2 className="text-xl font-semibold text-gray-800">
+                Pagamentos indisponíveis
+              </h2>
+              <p className="text-gray-600">
+                Este vendedor ainda não configurou sua conta para receber pagamentos.
+              </p>
+              <p className="text-sm text-gray-500">
+                Entre em contato diretamente com o vendedor.
+              </p>
+            </div>
+          ) : !paymentSuccess ? (
             <>
               {/* Step 1: Amount Input */}
               {!paymentMethod && (

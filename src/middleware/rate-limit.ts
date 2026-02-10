@@ -1,60 +1,86 @@
 /**
- * Simple in-memory rate limiter
- * For production, use Redis or Upstash
+ * Supabase-based rate limiter for serverless environments.
+ * Uses the `rate_limits` table to persist rate limit state across invocations.
+ *
+ * For high-traffic production use, consider upgrading to Upstash Redis.
  */
 
-interface RateLimitStore {
-  [key: string]: { count: number; resetTime: number }
+import { supabaseServer } from '@/lib/supabase/client';
+
+export interface RateLimitResult {
+  success: boolean;
+  remaining: number;
 }
 
-const store: RateLimitStore = {}
-
-export function rateLimit(
-  identifier: string,
+/**
+ * Check if the given key has exceeded its rate limit.
+ *
+ * @param key - Unique identifier (e.g. "payment:192.168.1.1" or "auth:user@email.com")
+ * @param limit - Maximum number of requests allowed within the window
+ * @param windowMs - Time window in milliseconds (default: 60000 = 1 minute)
+ */
+export async function rateLimit(
+  key: string,
   limit: number = 10,
-  windowMs: number = 60000 // 1 minute
-): { success: boolean; remaining: number; resetTime: number } {
-  const now = Date.now()
-  const key = identifier
+  windowMs: number = 60000
+): Promise<RateLimitResult> {
+  const windowStart = new Date(Date.now() - windowMs).toISOString();
 
-  // Clean up old entries
-  if (store[key] && store[key].resetTime < now) {
-    delete store[key]
-  }
+  try {
+    // Count requests in the current window
+    const { count, error: countError } = await supabaseServer
+      .from('rate_limits')
+      .select('*', { count: 'exact', head: true })
+      .eq('key', key)
+      .gte('created_at', windowStart);
 
-  // Initialize if doesn't exist
-  if (!store[key]) {
-    store[key] = {
-      count: 0,
-      resetTime: now + windowMs
+    if (countError) {
+      console.error('Rate limit count error:', countError.message);
+      // Fail open: allow the request if we can't check the rate limit
+      return { success: true, remaining: limit };
     }
-  }
 
-  // Increment
-  store[key].count++
+    const currentCount = count ?? 0;
 
-  // Check limit
-  if (store[key].count > limit) {
+    if (currentCount >= limit) {
+      return { success: false, remaining: 0 };
+    }
+
+    // Record this request
+    const { error: insertError } = await supabaseServer
+      .from('rate_limits')
+      .insert({ key });
+
+    if (insertError) {
+      console.error('Rate limit insert error:', insertError.message);
+      // Fail open
+      return { success: true, remaining: limit - currentCount };
+    }
+
     return {
-      success: false,
-      remaining: 0,
-      resetTime: store[key].resetTime
-    }
-  }
-
-  return {
-    success: true,
-    remaining: limit - store[key].count,
-    resetTime: store[key].resetTime
+      success: true,
+      remaining: limit - currentCount - 1,
+    };
+  } catch (err) {
+    console.error('Rate limit error:', err);
+    // Fail open on unexpected errors
+    return { success: true, remaining: limit };
   }
 }
 
-// Clean up old entries every 5 minutes
-setInterval(() => {
-  const now = Date.now()
-  Object.keys(store).forEach(key => {
-    if (store[key].resetTime < now) {
-      delete store[key]
-    }
-  })
-}, 5 * 60 * 1000)
+/**
+ * Clean up expired rate limit entries.
+ * Call this periodically (e.g. via a cron job or Supabase scheduled function).
+ */
+export async function cleanupRateLimits(olderThanMs: number = 300000) {
+  const cutoff = new Date(Date.now() - olderThanMs).toISOString();
+
+  const { error } = await supabaseServer
+    .from('rate_limits')
+    .delete()
+    .lt('created_at', cutoff);
+
+  if (error) {
+    console.error('Rate limit cleanup error:', error.message);
+  }
+}

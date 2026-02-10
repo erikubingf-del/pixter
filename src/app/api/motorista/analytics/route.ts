@@ -1,190 +1,136 @@
-import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { supabaseServer } from '@/lib/supabase/client'
+import { NextResponse } from 'next/server';
+import { requireMotorista } from '@/lib/auth/get-session';
+import { supabaseServer } from '@/lib/supabase/client';
+import { safeErrorResponse } from '@/lib/utils/api-error';
 
 export const dynamic = 'force-dynamic';
 
-
-/**
- * Advanced analytics for drivers
- * Future: Gate behind premium subscription
- */
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await requireMotorista();
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString();
 
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const thisWeekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()).toISOString();
+    const lastWeekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay() - 7).toISOString();
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-    // Get driver profile
-    const { data: profile, error: profileError } = await supabaseServer
-      .from('profiles')
-      .select('id, tipo')
-      .eq('email', session.user.email)
-      .single()
-
-    if (profileError || !profile) {
-      return NextResponse.json(
-        { error: 'Profile not found' },
-        { status: 404 }
-      )
-    }
-
-    if (profile.tipo !== 'motorista') {
-      return NextResponse.json(
-        { error: 'Only drivers can access analytics' },
-        { status: 403 }
-      )
-    }
-
-    // Fetch all payments for analytics
-    const { data: payments, error: paymentsError } = await supabaseServer
+    // Fetch all succeeded payments for the last 60 days
+    const { data: payments, error } = await supabaseServer
       .from('pagamentos')
-      .select('valor, metodo, payment_day_of_week, payment_hour, is_repeat_customer, created_at')
-      .eq('motorista_id', profile.id)
+      .select('id, created_at, valor, metodo, status')
+      .eq('motorista_id', session.id)
       .eq('status', 'succeeded')
-      .order('created_at', { ascending: false })
+      .gte('created_at', sixtyDaysAgo)
+      .order('created_at', { ascending: false });
 
-    if (paymentsError) {
-      console.error('Error fetching payments:', paymentsError)
-      return NextResponse.json(
-        { error: 'Failed to fetch analytics' },
-        { status: 500 }
-      )
+    if (error) {
+      return safeErrorResponse(error, 'Erro ao buscar dados analíticos');
     }
 
-    // Calculate insights
-    const insights = {
-      // Best day of week
-      bestDay: getBestDayOfWeek(payments || []),
+    const all = payments || [];
 
-      // Peak hours
-      peakHours: getPeakHours(payments || []),
+    // Today
+    const todayPayments = all.filter(p => p.created_at >= todayStart);
+    const todayTotal = todayPayments.reduce((s, p) => s + Number(p.valor), 0);
 
-      // Payment method preference
-      methodBreakdown: getMethodBreakdown(payments || []),
+    // This week vs last week
+    const thisWeekPayments = all.filter(p => p.created_at >= thisWeekStart);
+    const thisWeekTotal = thisWeekPayments.reduce((s, p) => s + Number(p.valor), 0);
+    const lastWeekPayments = all.filter(p => p.created_at >= lastWeekStart && p.created_at < thisWeekStart);
+    const lastWeekTotal = lastWeekPayments.reduce((s, p) => s + Number(p.valor), 0);
+    const weekChange = lastWeekTotal > 0
+      ? Math.round(((thisWeekTotal - lastWeekTotal) / lastWeekTotal) * 100)
+      : thisWeekTotal > 0 ? 100 : 0;
 
-      // Repeat customer rate
-      repeatCustomerRate: getRepeatCustomerRate(payments || []),
+    // This month
+    const thisMonthPayments = all.filter(p => p.created_at >= thisMonthStart);
+    const thisMonthTotal = thisMonthPayments.reduce((s, p) => s + Number(p.valor), 0);
 
-      // Average transaction
-      averageTransaction: getAverageTransaction(payments || []),
+    // Last 30 vs previous 30 (growth)
+    const last30 = all.filter(p => p.created_at >= thirtyDaysAgo);
+    const last30Total = last30.reduce((s, p) => s + Number(p.valor), 0);
+    const prev30 = all.filter(p => p.created_at >= sixtyDaysAgo && p.created_at < thirtyDaysAgo);
+    const prev30Total = prev30.reduce((s, p) => s + Number(p.valor), 0);
+    const monthGrowth = prev30Total > 0
+      ? Math.round(((last30Total - prev30Total) / prev30Total) * 100)
+      : last30Total > 0 ? 100 : 0;
 
-      // Growth trend (last 30 days vs previous 30 days)
-      growthTrend: getGrowthTrend(payments || [])
+    // Average ticket (last 30 days)
+    const averageTicket = last30.length > 0
+      ? Math.round(last30Total / last30.length)
+      : 0;
+
+    // Busiest hours (last 30 days)
+    const hourCounts: Record<number, { count: number; total: number }> = {};
+    last30.forEach(p => {
+      const hour = new Date(p.created_at).getHours();
+      if (!hourCounts[hour]) hourCounts[hour] = { count: 0, total: 0 };
+      hourCounts[hour].count++;
+      hourCounts[hour].total += Number(p.valor);
+    });
+    const busiestHours = Object.entries(hourCounts)
+      .sort(([, a], [, b]) => b.count - a.count)
+      .slice(0, 3)
+      .map(([hour, data]) => ({
+        hour: parseInt(hour),
+        label: `${hour.padStart(2, '0')}:00`,
+        count: data.count,
+        total: data.total,
+      }));
+
+    // Payment method breakdown (last 30 days)
+    const methods: Record<string, number> = {};
+    last30.forEach(p => {
+      const m = p.metodo || 'card';
+      methods[m] = (methods[m] || 0) + 1;
+    });
+
+    // Daily totals for chart (last 7 days)
+    const dailyTotals: { date: string; label: string; total: number; count: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const nextD = new Date(d.getTime() + 24 * 60 * 60 * 1000);
+      const dayPayments = all.filter(
+        p => p.created_at >= d.toISOString() && p.created_at < nextD.toISOString()
+      );
+      dailyTotals.push({
+        date: d.toISOString().split('T')[0],
+        label: d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit' }),
+        total: dayPayments.reduce((s, p) => s + Number(p.valor), 0),
+        count: dayPayments.length,
+      });
     }
 
-    return NextResponse.json({ insights })
-  } catch (error: any) {
-    console.error('Error in analytics route:', error)
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    )
-  }
-}
+    // Best day of week (last 30 days)
+    const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const dayTotals: Record<number, number> = {};
+    last30.forEach(p => {
+      const dow = new Date(p.created_at).getDay();
+      dayTotals[dow] = (dayTotals[dow] || 0) + Number(p.valor);
+    });
+    const bestDay = Object.entries(dayTotals).sort(([, a], [, b]) => b - a)[0];
 
-function getBestDayOfWeek(payments: any[]) {
-  const dayTotals: { [key: string]: number } = {}
-
-  payments.forEach(p => {
-    const day = p.payment_day_of_week || 'Unknown'
-    dayTotals[day] = (dayTotals[day] || 0) + p.valor
-  })
-
-  const bestDay = Object.entries(dayTotals)
-    .sort(([, a], [, b]) => b - a)[0]
-
-  return bestDay ? {
-    day: bestDay[0],
-    total: bestDay[1],
-    percentage: (bestDay[1] / payments.reduce((sum, p) => sum + p.valor, 0) * 100).toFixed(1)
-  } : null
-}
-
-function getPeakHours(payments: any[]) {
-  const hourTotals: { [key: number]: number } = {}
-
-  payments.forEach(p => {
-    if (p.payment_hour !== null) {
-      hourTotals[p.payment_hour] = (hourTotals[p.payment_hour] || 0) + p.valor
+    return NextResponse.json({
+      today: { total: todayTotal, count: todayPayments.length },
+      thisWeek: { total: thisWeekTotal, count: thisWeekPayments.length },
+      lastWeek: { total: lastWeekTotal, count: lastWeekPayments.length },
+      weekChange,
+      thisMonth: { total: thisMonthTotal, count: thisMonthPayments.length },
+      monthGrowth,
+      averageTicket,
+      busiestHours,
+      methodBreakdown: methods,
+      dailyTotals,
+      bestDay: bestDay ? { day: dayNames[parseInt(bestDay[0])], total: bestDay[1] } : null,
+      totalPayments30d: last30.length,
+    });
+  } catch (error: unknown) {
+    if (error instanceof Error && error.name === 'AuthError') {
+      return NextResponse.json({ error: error.message }, { status: 401 });
     }
-  })
-
-  return Object.entries(hourTotals)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 3)
-    .map(([hour, total]) => ({
-      hour: parseInt(hour),
-      total,
-      timeRange: `${hour}:00 - ${parseInt(hour) + 1}:00`
-    }))
-}
-
-function getMethodBreakdown(payments: any[]) {
-  const methodTotals: { [key: string]: { total: number; count: number } } = {}
-
-  payments.forEach(p => {
-    const method = p.metodo || 'unknown'
-    if (!methodTotals[method]) {
-      methodTotals[method] = { total: 0, count: 0 }
-    }
-    methodTotals[method].total += p.valor
-    methodTotals[method].count += 1
-  })
-
-  return Object.entries(methodTotals).map(([method, data]) => ({
-    method,
-    total: data.total,
-    count: data.count,
-    average: data.total / data.count
-  }))
-}
-
-function getRepeatCustomerRate(payments: any[]) {
-  const repeatPayments = payments.filter(p => p.is_repeat_customer).length
-  const totalPayments = payments.length
-
-  return totalPayments > 0 ? {
-    rate: (repeatPayments / totalPayments * 100).toFixed(1),
-    repeatCount: repeatPayments,
-    totalCount: totalPayments
-  } : null
-}
-
-function getAverageTransaction(payments: any[]) {
-  if (payments.length === 0) return 0
-  const total = payments.reduce((sum, p) => sum + p.valor, 0)
-  return total / payments.length
-}
-
-function getGrowthTrend(payments: any[]) {
-  const now = new Date()
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-  const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
-
-  const last30Days = payments.filter(p =>
-    new Date(p.created_at) >= thirtyDaysAgo
-  ).reduce((sum, p) => sum + p.valor, 0)
-
-  const previous30Days = payments.filter(p => {
-    const date = new Date(p.created_at)
-    return date >= sixtyDaysAgo && date < thirtyDaysAgo
-  }).reduce((sum, p) => sum + p.valor, 0)
-
-  const growth = previous30Days > 0
-    ? ((last30Days - previous30Days) / previous30Days * 100).toFixed(1)
-    : '0'
-
-  return {
-    last30Days,
-    previous30Days,
-    growthPercentage: parseFloat(growth),
-    trending: parseFloat(growth) > 0 ? 'up' : parseFloat(growth) < 0 ? 'down' : 'stable'
+    return safeErrorResponse(error, 'Erro ao buscar dados analíticos');
   }
 }

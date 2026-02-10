@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseServer } from '@/lib/supabase/client'
+import { safeErrorResponse } from '@/lib/utils/api-error'
 
 export const dynamic = 'force-dynamic';
 
@@ -49,11 +50,12 @@ export async function GET(request: Request) {
     startDate.setDate(startDate.getDate() - days)
 
     // Fetch payments where this user is the motorista (recipient)
+    // Include both succeeded and pending so the UI can show pending Pix payments
     const { data: payments, error } = await supabaseServer
       .from('pagamentos')
       .select('id, created_at, valor, metodo, status')
       .eq('motorista_id', profile.id)
-      .eq('status', 'succeeded')
+      .in('status', ['succeeded', 'pending'])
       .gte('created_at', startDate.toISOString())
       .order('created_at', { ascending: false })
 
@@ -66,11 +68,7 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({ payments: payments || [] })
-  } catch (error: any) {
-    console.error('Error in motorista lucro route:', error)
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    return safeErrorResponse(error, 'Erro ao buscar pagamentos')
   }
 }

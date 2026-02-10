@@ -5,93 +5,127 @@ import { getToken } from 'next-auth/jwt';
 /**
  * Global middleware that:
  *  1. Checks NextAuth session
- *  2. Redirects unauthenticated users away from protected pages → /login
- *  3. Redirects authenticated users away from login/cadastro pages → /cliente/dashboard
+ *  2. Protects API routes (only specific ones are public)
+ *  3. Redirects unauthenticated users away from protected pages
+ *  4. Enforces role-based access (motorista vs cliente)
  */
 export async function middleware(req: NextRequest) {
-  /* -------------------------------------------------------------
-     1. Get the NextAuth session token
-  --------------------------------------------------------------*/
   const session = await getToken({
-     req,
-     secret: process.env.NEXTAUTH_SECRET
-   });
-   
-  /* -------------------------------------------------------------
-     2. Decide whether this path needs auth. Anything that is NOT
-        /login, /cadastro, /public/* or /api/* is considered private.
-  --------------------------------------------------------------*/
+    req,
+    secret: process.env.NEXTAUTH_SECRET
+  });
+
   const { pathname } = req.nextUrl;
-   
-  const isPublic =
+  const isAuthenticated = !!session;
+
+  // --- Public routes that do NOT require authentication ---
+  const isPublicRoute =
+    // Static/info pages
+    pathname === '/' ||
     pathname.startsWith('/login') ||
     pathname.startsWith('/cadastro') ||
-    pathname.startsWith('/public') ||
-    pathname.startsWith('/api') ||
     pathname.startsWith('/motorista/login') ||
+    pathname.startsWith('/motorista/cadastro') ||
     pathname.startsWith('/images') ||
     pathname.startsWith('/termos') ||
     pathname.startsWith('/privacidade') ||
-    pathname.startsWith('/auth/callback') ||
-    pathname === '/';
-   
-  const isAuthenticated = !!session;
-  
-  // If not authenticated and trying to access a protected route
-  if (!isAuthenticated && !isPublic) {
-    // Preserve the original url so we can send the user back after login
+    pathname.startsWith('/pagamento') ||
+    pathname.startsWith('/public') ||
+    // NextAuth handler
+    pathname.startsWith('/api/auth') ||
+    // Public API routes
+    pathname.startsWith('/api/public') ||
+    // Stripe webhook (verified by signature, not session)
+    pathname === '/api/stripe/webhook' ||
+    // Customer-facing payment creation (no login required)
+    pathname === '/api/stripe/create-payment-intent' ||
+    pathname === '/api/stripe/create-pix-payment' ||
+    pathname.startsWith('/api/stripe/check-pix-status') ||
+    // Pix payment routes (guest payments)
+    pathname.startsWith('/api/pix') ||
+    // Auth callback
+    pathname.startsWith('/auth/callback');
+
+  // Dynamic phone number routes (e.g., /5511999999999)
+  const isPhoneNumberRoute = /^\/\d{10,13}$/.test(pathname);
+
+  if (isPublicRoute || isPhoneNumberRoute) {
+    // For authenticated users on login pages, redirect to dashboard
+    if (isAuthenticated) {
+      const isLoginPage =
+        pathname === '/login' ||
+        pathname === '/cadastro';
+
+      const isMotoristaLoginPage =
+        pathname === '/motorista/login';
+
+      const userType = (session.tipo as string) || 'cliente';
+
+      if (isLoginPage || (isMotoristaLoginPage && userType === 'cliente')) {
+        return NextResponse.redirect(new URL('/cliente/dashboard', req.url));
+      } else if (isMotoristaLoginPage && userType === 'motorista') {
+        return NextResponse.redirect(new URL('/motorista/dashboard', req.url));
+      }
+    }
+    return NextResponse.next();
+  }
+
+  // --- Protected routes: require authentication ---
+  if (!isAuthenticated) {
     const loginUrl = req.nextUrl.clone();
-         
-    // Determine the right login page based on the path
-    if (pathname.startsWith('/motorista')) {
+
+    if (pathname.startsWith('/motorista') || pathname.startsWith('/api/motorista')) {
       loginUrl.pathname = '/motorista/login';
     } else {
       loginUrl.pathname = '/login';
     }
-         
+
+    // For API routes, return 401 instead of redirect
+    if (pathname.startsWith('/api')) {
+      return NextResponse.json(
+        { error: 'Não autorizado' },
+        { status: 401 }
+      );
+    }
+
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
   }
-   
-  // If authenticated and trying to access login or registration pages
-  if (isAuthenticated) {
-    // Check if user is on login or registration pages
-    const isLoginPage = 
-      pathname === '/login' || 
-      pathname === '/cadastro';
-    
-    const isMotoristaLoginPage =
-      pathname === '/motorista/login';
-    
-    // Get user type from session token
-    const userType = session.tipo as string || 'cliente';
-    
-    // Redirect to appropriate dashboard based on user type
-    if (isLoginPage || (isMotoristaLoginPage && userType === 'cliente')) {
-      const dashboardUrl = new URL('/cliente/dashboard', req.url);
-      return NextResponse.redirect(dashboardUrl);
-    } else if (isMotoristaLoginPage && userType === 'motorista') {
-      const dashboardUrl = new URL('/motorista/dashboard', req.url);
-      return NextResponse.redirect(dashboardUrl);
+
+  // --- Role-based access control ---
+  const userType = (session.tipo as string) || 'cliente';
+
+  // Motorista routes require motorista role
+  if (pathname.startsWith('/motorista') || pathname.startsWith('/api/motorista')) {
+    if (userType !== 'motorista') {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json(
+          { error: 'Acesso negado' },
+          { status: 403 }
+        );
+      }
+      return NextResponse.redirect(new URL('/cliente/dashboard', req.url));
     }
   }
-   
-  // Session is present OR the route is public → let the request pass
+
+  // Cliente routes require cliente role
+  if (pathname.startsWith('/cliente') || pathname.startsWith('/api/client')) {
+    if (userType !== 'cliente') {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json(
+          { error: 'Acesso negado' },
+          { status: 403 }
+        );
+      }
+      return NextResponse.redirect(new URL('/motorista/dashboard', req.url));
+    }
+  }
+
   return NextResponse.next();
 }
 
-/* ---------------------------------------------------------------
-  Only run the middleware where it makes sense (everything except
-  static assets & Next-internal paths).
-----------------------------------------------------------------*/
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static        (static files)
-     * - _next/image         (image optimisation)
-     * - favicon.ico         (favicon)
-     */
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };

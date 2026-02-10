@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseServer } from '@/lib/supabase/client'
+import { safeErrorResponse } from '@/lib/utils/api-error'
 
 export const dynamic = 'force-dynamic';
 
@@ -33,12 +34,8 @@ export async function GET() {
     }
 
     return NextResponse.json({ profile })
-  } catch (error: any) {
-    console.error('Error in profile route:', error)
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    return safeErrorResponse(error, 'Erro ao buscar perfil')
   }
 }
 
@@ -81,11 +78,7 @@ export async function PATCH(request: Request) {
     }
 
     return NextResponse.json({ profile })
-  } catch (error: any) {
-    console.error('Error in profile update route:', error)
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    return safeErrorResponse(error, 'Erro ao atualizar perfil')
   }
 }

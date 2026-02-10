@@ -24,6 +24,7 @@ export default function PostPaymentSignup({
   const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [cardSaved, setCardSaved] = useState(false)
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -98,26 +99,31 @@ export default function PostPaymentSignup({
         throw new Error('Código inválido ou expirado')
       }
 
-      // Link payment to the newly created account
-      const linkRes = await fetch('/api/auth/link-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paymentIntentId })
-      })
+      // Link payment and auto-save card to the newly created account
+      let cardWasSaved = false
+      try {
+        const linkRes = await fetch('/api/auth/link-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paymentIntentId })
+        })
 
-      if (!linkRes.ok) {
-        const linkData = await linkRes.json()
-        console.error('Failed to link payment:', linkData.error)
+        if (linkRes.ok) {
+          const linkData = await linkRes.json()
+          cardWasSaved = linkData.cardSaved === true
+        }
+      } catch {
         // Don't fail the whole flow - account was created successfully
       }
 
       setStep('success')
+      setCardSaved(cardWasSaved)
 
-      // Wait 2 seconds then redirect to dashboard
+      // Wait 3 seconds then redirect to dashboard
       setTimeout(() => {
         onSuccess()
         window.location.href = '/cliente/dashboard'
-      }, 2000)
+      }, 3000)
 
     } catch (err: any) {
       console.error('Error verifying OTP:', err)
@@ -308,7 +314,7 @@ export default function PostPaymentSignup({
 
         {/* Success Step */}
         {step === 'success' && (
-          <div className="text-center py-8">
+          <div className="text-center py-6">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -317,6 +323,13 @@ export default function PostPaymentSignup({
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
               Conta Criada!
             </h2>
+            {cardSaved && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 mx-4">
+                <p className="text-sm text-green-700 font-medium">
+                  💳 Seu cartão foi salvo para pagamentos mais rápidos
+                </p>
+              </div>
+            )}
             <p className="text-gray-600 mb-4">
               Redirecionando para o painel...
             </p>

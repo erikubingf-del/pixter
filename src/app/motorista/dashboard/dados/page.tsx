@@ -87,7 +87,6 @@ export default function MeusDadosPage() {
       }
       
       const data = await resp.json();
-      console.log("Profile data loaded:", data);
       setProfile(data);
       setFormState({
         nome: data.nome || "",
@@ -124,13 +123,6 @@ export default function MeusDadosPage() {
       setError(null);
       setShowAvatarSelector(false);
       
-      // Debug logging
-      console.log("Submitting profile update with data:", {
-        nome: formState.nome,
-        profissao: formState.profissao,
-        avatar_url: formState.avatar_url,
-      });
-      
       const resp = await fetch("/api/motorista/profile", {
         method: "PUT",
         headers: {
@@ -149,8 +141,6 @@ export default function MeusDadosPage() {
       }
       
       const updatedData = await resp.json();
-      console.log("Profile update response:", updatedData);
-      
       // Make sure we're updating the profile with the correct data
       // The API returns profile in the response data
       if (updatedData?.profile) {

@@ -17,15 +17,16 @@ import {
 
 type BalanceEntry = { amount: string; currency: string };
 type Transaction = {
-  id: string; // Balance Transaction ID
-  chargeId: string | null; // Charge ID for receipt
-  data: string; // Date (ISO string from backend)
+  id: string;
+  chargeId: string | null;
+  data: string;
   amount: string;
-  metodo: string | null; // Payment method
-  cliente: string | null; // Client email/identifier
+  metodo: string | null;
+  cliente: string | null;
   description?: string;
   type: string;
   fee?: string;
+  status?: string;
 };
 
 type Period = "day" | "week" | "month";
@@ -198,10 +199,10 @@ export default function MeusPagamentosPage() {
                 {/* Use light gray background for header, remove uppercase, add padding */} 
                 <thead className="bg-gray-50">
                   <tr>
-                    {["Data", "Valor", "Método", "Cliente", ""].map((th, index) => (
-                      <th 
-                        key={th} 
-                        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 ${index === 4 ? 'text-right' : ''}`}
+                    {["Data", "Valor", "Status", "Método", "Cliente", ""].map((th, index) => (
+                      <th
+                        key={th}
+                        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 ${index === 5 ? 'text-right' : ''}`}
                       >
                         {th}
                       </th>
@@ -215,17 +216,44 @@ export default function MeusPagamentosPage() {
                         {new Date(t.data).toLocaleDateString("pt-BR")}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{t.amount}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {(() => {
+                          const statusMap: Record<string, { text: string; cls: string }> = {
+                            succeeded: { text: 'Pago', cls: 'bg-green-100 text-green-800' },
+                            completed: { text: 'Pago', cls: 'bg-green-100 text-green-800' },
+                            pending: { text: 'Pendente', cls: 'bg-yellow-100 text-yellow-800' },
+                            failed: { text: 'Falhou', cls: 'bg-red-100 text-red-800' },
+                            disputed: { text: 'Contestado', cls: 'bg-orange-100 text-orange-800' },
+                            refunded: { text: 'Reembolsado', cls: 'bg-blue-100 text-blue-800' },
+                          };
+                          const s = statusMap[t.status || 'succeeded'] || statusMap.succeeded;
+                          return (
+                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${s.cls}`}>
+                              {s.text}
+                            </span>
+                          );
+                        })()}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{t.metodo || "-"}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{t.cliente || "-"}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                         {t.chargeId && (
-                          <Link
-                            href={`/api/receipts/${t.chargeId}?type=driver`}
-                            target="_blank"
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/receipts/${t.chargeId}?type=driver`)
+                                if (!res.ok) throw new Error('Erro ao gerar recibo')
+                                const blob = await res.blob()
+                                const url = URL.createObjectURL(blob)
+                                window.open(url, '_blank')
+                              } catch {
+                                alert('Erro ao abrir recibo. Tente novamente.')
+                              }
+                            }}
                             className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                           >
-                            Baixar Recibo
-                          </Link>
+                            Ver Recibo
+                          </button>
                         )}
                       </td>
                     </tr>
@@ -239,11 +267,28 @@ export default function MeusPagamentosPage() {
         )}
       </div>
 
-      {/* Hidden Date Filter Inputs (or replace with a proper date range picker component) */}
-      <div className="hidden">
-        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-        <button onClick={handleFilter}>Filter</button>
+      {/* Date Filter */}
+      <div className="bg-white rounded-lg shadow p-4 mt-4 flex flex-wrap items-center gap-3">
+        <label className="text-sm text-gray-600">Filtrar por período:</label>
+        <input
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:ring-purple-500 focus:border-purple-500"
+        />
+        <span className="text-gray-400">até</span>
+        <input
+          type="date"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+          className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:ring-purple-500 focus:border-purple-500"
+        />
+        <button
+          onClick={handleFilter}
+          className="text-sm bg-purple-600 text-white px-4 py-1.5 rounded-md hover:bg-purple-700 transition"
+        >
+          Aplicar
+        </button>
       </div>
     </div>
   );

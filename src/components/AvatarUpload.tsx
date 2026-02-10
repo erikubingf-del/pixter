@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"; // Use Auth Helper client
+import { createBrowserClient } from "@/lib/supabase/client";
 import Image from "next/image";
 import type { User } from "@supabase/supabase-js";
 
@@ -14,7 +14,7 @@ interface AvatarUploadProps {
 }
 
 export default function AvatarUpload({ currentAvatarUrl, onUpdate, userId }: AvatarUploadProps) {
-  const supabase = createClientComponentClient(); // Initialize client
+  const supabase = createBrowserClient();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(currentAvatarUrl || null);

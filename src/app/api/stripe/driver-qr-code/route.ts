@@ -1,7 +1,7 @@
-// src/app/api/stripe/driver-qr-code/route.ts
 import { NextResponse, NextRequest } from "next/server";
 import QRCode from "qrcode";
 import { supabaseServer } from "@/lib/supabase/client";
+import { safeErrorResponse } from "@/lib/utils/api-error";
 
 export const dynamic = 'force-dynamic';
 
@@ -14,42 +14,31 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "ID do motorista não fornecido." }, { status: 400 });
     }
 
-    // 1. Fetch driver profile to get phone number
     const { data: profile, error: profileError } = await supabaseServer
       .from("profiles")
       .select("celular")
       .eq("id", driverId)
-      .eq("tipo", "motorista") // Ensure it's a driver
+      .eq("tipo", "motorista")
       .single();
 
     if (profileError || !profile || !profile.celular) {
-      console.error("Error fetching profile or missing phone number:", profileError?.message);
-      return NextResponse.json({ error: "Perfil do motorista não encontrado ou número de celular ausente." }, { status: 404 });
+      return NextResponse.json({ error: "Perfil do motorista não encontrado." }, { status: 404 });
     }
 
-    // 2. Construct the public payment URL
-    // Remove non-digits and strip country code (55) for Brazilian numbers
     const digitsOnly = profile.celular.replace(/\D/g, "");
     const formattedPhoneForUrl = digitsOnly.startsWith("55") ? digitsOnly.substring(2) : digitsOnly;
-    const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const paymentUrl = `${origin}/${formattedPhoneForUrl}`;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const paymentUrl = `${appUrl}/${formattedPhoneForUrl}`;
 
-    // 3. Generate QR Code as Data URL
     const qrCodeDataUrl = await QRCode.toDataURL(paymentUrl, {
-      errorCorrectionLevel: "H", // High error correction
+      errorCorrectionLevel: "H",
       type: "image/png",
       margin: 1,
-      width: 200, // Adjust size as needed
+      width: 200,
     });
 
-    // 4. Return the QR Code Data URL
-    return NextResponse.json({ qrCode: qrCodeDataUrl, paymentUrl: paymentUrl });
-
+    return NextResponse.json({ qrCode: qrCodeDataUrl, paymentUrl });
   } catch (error: any) {
-    console.error("QR Code generation error:", error);
-    return NextResponse.json(
-      { error: error.message || "Falha ao gerar QR code." },
-      { status: 500 }
-    );
+    return safeErrorResponse(error, "Falha ao gerar QR code.");
   }
 }

@@ -1,100 +1,72 @@
 import { NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { requireAuth } from '@/lib/auth/get-session';
+import { supabaseServer } from '@/lib/supabase/client';
+import { safeErrorResponse } from '@/lib/utils/api-error';
+
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 export async function POST(request: Request) {
-  const cookieStore = await cookies();
-  const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-
   try {
-    // 1. Check Authentication
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session) {
-      console.error('Authentication error:', sessionError);
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
-    const userId = session.user.id;
+    const session = await requireAuth();
+    const userId = session.id;
 
-    // 2. Parse FormData
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
-    // The user ID should come from the authenticated session, not form data for security
-    // const driverId = formData.get('driverId') as string;
 
     if (!file) {
-      return NextResponse.json(
-        { error: 'Nenhum arquivo fornecido' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Nenhum arquivo fornecido' }, { status: 400 });
     }
 
-    // 3. Prepare File for Upload
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${userId}-${Date.now()}.${fileExt}`;
-    const filePath = `${userId}/${fileName}`; // Store under user's ID folder
+    // Validate MIME type
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      return NextResponse.json({ error: 'Tipo de arquivo não permitido. Use JPEG, PNG ou WebP.' }, { status: 400 });
+    }
 
-    // 4. Upload File to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('avatars') // Ensure 'avatars' bucket exists and has policies set up
-      .upload(filePath, file, {
-        // contentType: file.type, // Let Supabase infer content type
-        upsert: false // Don't upsert by default, maybe allow later if needed
-      });
+    // Validate extension
+    const ext = '.' + (file.name.split('.').pop()?.toLowerCase() || '');
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      return NextResponse.json({ error: 'Extensão de arquivo não permitida.' }, { status: 400 });
+    }
+
+    // Validate size
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ error: 'Arquivo muito grande. O limite é 5MB.' }, { status: 413 });
+    }
+
+    const fileName = `${userId}-${Date.now()}${ext}`;
+    const filePath = `${userId}/${fileName}`;
+
+    const { error: uploadError } = await supabaseServer.storage
+      .from('avatars')
+      .upload(filePath, file, { upsert: false });
 
     if (uploadError) {
-      console.error('Erro ao fazer upload do avatar:', uploadError);
-      return NextResponse.json(
-        { error: `Falha no upload: ${uploadError.message}` },
-        { status: 500 }
-      );
+      return safeErrorResponse(uploadError, 'Falha no upload do avatar');
     }
 
-    // 5. Get Public URL (or construct it if policies allow)
-    const { data: urlData } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(filePath);
-
+    const { data: urlData } = supabaseServer.storage.from('avatars').getPublicUrl(filePath);
     if (!urlData?.publicUrl) {
-        // Attempt to delete the uploaded file if URL retrieval fails
-        await supabase.storage.from('avatars').remove([filePath]);
-        console.error('Failed to get public URL for uploaded avatar:', filePath);
-        return NextResponse.json({ error: 'Não foi possível obter a URL pública do avatar.' }, { status: 500 });
+      await supabaseServer.storage.from('avatars').remove([filePath]);
+      return NextResponse.json({ error: 'Não foi possível obter a URL do avatar.' }, { status: 500 });
     }
-    const newAvatarUrl = urlData.publicUrl;
 
-    // 6. Update Avatar URL in User's Profile
-    // Use the route handler client, assuming RLS allows users to update their own profile
-    const { error: updateError } = await supabase
-      .from('profiles') // Update the 'profiles' table
-      .update({ avatar_url: newAvatarUrl, updated_at: new Date().toISOString() })
-      .eq('id', userId); // Update the profile matching the authenticated user ID
+    const { error: updateError } = await supabaseServer
+      .from('profiles')
+      .update({ avatar_url: urlData.publicUrl, updated_at: new Date().toISOString() })
+      .eq('id', userId);
 
     if (updateError) {
-      // Attempt to delete the uploaded file if DB update fails
-      await supabase.storage.from('avatars').remove([filePath]);
-      console.error('Erro ao atualizar avatar_url no perfil:', updateError);
-      return NextResponse.json(
-        { error: `Falha ao atualizar perfil: ${updateError.message}` },
-        { status: 500 }
-      );
+      await supabaseServer.storage.from('avatars').remove([filePath]);
+      return safeErrorResponse(updateError, 'Falha ao atualizar perfil');
     }
 
-    // 7. Return Success Response
-    return NextResponse.json({
-      success: true,
-      message: 'Avatar atualizado com sucesso!',
-      avatarUrl: newAvatarUrl
-    });
-
+    return NextResponse.json({ success: true, message: 'Avatar atualizado com sucesso!', avatarUrl: urlData.publicUrl });
   } catch (error: any) {
-    console.error('Erro no upload de avatar:', error);
-    if (error instanceof Error && error.message.includes('Payload too large')) {
-        return NextResponse.json({ error: 'Arquivo muito grande. O limite é 1MB.' }, { status: 413 });
+    if (error.name === 'AuthError') {
+      return NextResponse.json({ error: error.message }, { status: error.status });
     }
-    return NextResponse.json(
-      { error: error.message || 'Erro interno do servidor' },
-      { status: 500 }
-    );
+    return safeErrorResponse(error, 'Erro interno do servidor');
   }
 }
-

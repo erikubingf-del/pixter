@@ -1,44 +1,15 @@
-// src/app/api/stripe/create-payment-intent/route.ts
 import { NextResponse } from "next/server";
-import { Stripe } from "stripe";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import Stripe from "stripe";
+import stripe, { calculateFee, validateAmount, getCardPaymentOptions } from "@/lib/stripe/server";
 import { supabaseServer } from "@/lib/supabase/client";
-import { rateLimit } from "@/middleware/rate-limit";
-
-// Initialize Stripe (Use environment variables!)
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_YOUR_KEY", {
-  apiVersion: "2022-11-15",
-});
-
-// Helper function to calculate application fee (4% for MVP)
-// This is AmoPagar's commission - we keep 4%, use ~2-3% for Stripe fees, keep 1-2% profit
-const calculateApplicationFeeAmount = (amount: number): number => {
-  // Amount is already in cents
-  return Math.floor(amount * 0.04); // 4% fee, rounded down
-};
+import { safeErrorResponse } from "@/lib/utils/api-error";
 
 export async function POST(request: Request) {
   try {
     const { amount, driverPhoneNumber } = await request.json();
 
-    // Rate limiting: Max 5 payment intents per IP per minute
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
-    const rateLimitResult = rateLimit(`payment-intent:${ip}`, 5, 60000)
-
-    if (!rateLimitResult.success) {
-      return NextResponse.json(
-        { error: 'Muitas tentativas. Aguarde um momento e tente novamente.' },
-        {
-          status: 429,
-          headers: {
-            'X-RateLimit-Limit': '5',
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': rateLimitResult.resetTime.toString()
-          }
-        }
-      )
-    }
-
-    // Basic validation
     if (!amount || typeof amount !== "number" || amount <= 0) {
       return NextResponse.json({ error: "Valor inválido." }, { status: 400 });
     }
@@ -46,69 +17,88 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Identificação do motorista inválida." }, { status: 400 });
     }
 
-    // Amount is already in cents from the frontend (see [phoneNumber]/page.tsx:176)
-    // No conversion needed - Stripe expects integer amount in smallest currency unit
     const amountInCents = Math.round(amount);
 
-    // 1. Find the driver's profile using the phone number
-    // Assuming phone number is stored in E.164 format in auth.users
-    // We need to join profiles with auth.users or query profiles by a unique identifier derived from phone
-    // For simplicity, let's assume a direct lookup on a formatted phone number in profiles for now
-    // WARNING: This lookup might need adjustment based on your exact schema and how phone numbers are stored/queried.
-    // A better approach might be to query auth.users by phone, get the ID, then query profiles by ID.
-    const formattedPhone = `+${driverPhoneNumber.replace(/\D/g, "")}`; // Ensure E.164
-
-    const { data: profile, error: profileError } = await supabaseServer
-      .from("profiles")
-      .select("id, stripe_account_id") // Select Stripe ID
-      .eq("celular", formattedPhone) // Querying by 'celular' column
-      .eq("tipo", "motorista")
-      .maybeSingle(); // Use maybeSingle to handle not found gracefully
-
-    if (profileError) {
-      console.error("Error fetching driver profile:", profileError.message);
-      return NextResponse.json({ error: "Erro ao buscar motorista." }, { status: 500 });
+    const amountError = validateAmount(amountInCents);
+    if (amountError) {
+      return NextResponse.json({ error: amountError }, { status: 400 });
     }
 
-    if (!profile || !profile.stripe_account_id) {
-      console.log("Driver not found or Stripe not connected for phone:", formattedPhone);
+    const formattedPhone = `+${driverPhoneNumber.replace(/\D/g, "")}`;
+
+    const { data: driverProfile, error: profileError } = await supabaseServer
+      .from("profiles")
+      .select("id, stripe_account_id, stripe_account_charges_enabled")
+      .eq("celular", formattedPhone)
+      .eq("tipo", "motorista")
+      .maybeSingle();
+
+    if (profileError) {
+      return safeErrorResponse(profileError, "Erro ao buscar motorista.");
+    }
+
+    if (!driverProfile || !driverProfile.stripe_account_id) {
       return NextResponse.json({ error: "Motorista não encontrado ou não habilitado para pagamentos." }, { status: 404 });
     }
 
-    const stripeAccountId = profile.stripe_account_id;
+    if (driverProfile.stripe_account_charges_enabled === false) {
+      return NextResponse.json({ error: "Conta do motorista ainda não está ativa para receber pagamentos." }, { status: 400 });
+    }
 
-    // 2. Create a Payment Intent with Stripe
-    const applicationFee = calculateApplicationFeeAmount(amountInCents);
+    const applicationFee = calculateFee(amountInCents);
 
-    const paymentIntent = await stripe.paymentIntents.create({
+    // Check if user is logged in and has a saved Stripe customer
+    let customerId: string | undefined;
+    let ephemeralKey: string | undefined;
+    const session = await getServerSession(authOptions);
+    if (session?.user?.id) {
+      const { data: userProfile } = await supabaseServer
+        .from("profiles")
+        .select("stripe_customer_id, default_payment_method")
+        .eq("id", session.user.id)
+        .single();
+
+      if (userProfile?.stripe_customer_id) {
+        customerId = userProfile.stripe_customer_id;
+        // Create ephemeral key for the customer so Stripe Elements can show saved cards
+        try {
+          const ek = await stripe.ephemeralKeys.create(
+            { customer: customerId },
+            { apiVersion: "2022-11-15" }
+          );
+          ephemeralKey = ek.secret;
+        } catch {
+          // Non-critical: proceed without saved cards
+        }
+      }
+    }
+
+    const piParams: Stripe.PaymentIntentCreateParams = {
       amount: amountInCents,
-      currency: "brl", // Brazilian Real
-      automatic_payment_methods: {
-        enabled: true, // Let Stripe handle payment methods like Card, Pix, etc.
-      },
-      // --- Crucial for Connect ---
-      transfer_data: {
-        destination: stripeAccountId, // Transfer funds to the connected driver account
-      },
-      // Application Fee (AmoPagar's 4% commission)
+      currency: "brl",
+      automatic_payment_methods: { enabled: true },
+      transfer_data: { destination: driverProfile.stripe_account_id },
       application_fee_amount: applicationFee,
-      // ---------------------------
+      payment_method_options: getCardPaymentOptions(amountInCents),
       metadata: {
-        driverId: profile.id, // Store driver ID for reconciliation (matches webhook)
-        driverPhoneNumber: formattedPhone, // Store driver phone
-        payingPhoneNumber: driverPhoneNumber, // Store identifier used for payment page
-        applicationFee: applicationFee.toString(), // Store fee for records
+        driverId: driverProfile.id,
+        driverPhoneNumber: formattedPhone,
+        payingPhoneNumber: driverPhoneNumber,
+        applicationFee: applicationFee.toString(),
+        ...(session?.user?.id ? { clienteId: session.user.id } : {}),
       },
+      ...(customerId ? { customer: customerId } : {}),
+    };
+
+    const paymentIntent = await stripe.paymentIntents.create(piParams);
+
+    return NextResponse.json({
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      ...(ephemeralKey ? { ephemeralKeySecret: ephemeralKey } : {}),
+      ...(customerId ? { customerId } : {}),
     });
-
-    // 3. Return the client secret to the frontend
-    return NextResponse.json({ clientSecret: paymentIntent.client_secret });
-
-  } catch (error: any) {
-    console.error("Create Payment Intent error:", error);
-    return NextResponse.json(
-      { error: error.message || "Falha ao iniciar pagamento." },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    return safeErrorResponse(error, "Falha ao iniciar pagamento.");
   }
 }

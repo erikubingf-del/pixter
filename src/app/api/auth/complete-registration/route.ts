@@ -1,38 +1,17 @@
-// src/app/api/auth/complete-registration/route.ts
 import { NextResponse } from "next/server";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
-import {
-  formatPhoneNumber,
-  supabaseServer,
-} from "@/lib/supabase/client";
+import { requireAuth } from "@/lib/auth/get-session";
+import { supabaseServer, formatPhoneNumber } from "@/lib/supabase/client";
+import { safeErrorResponse } from "@/lib/utils/api-error";
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    console.log("=== complete-registration route called ===");
-
-    // Get authenticated user from session
-    const cookieStore = await cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      console.error("User not authenticated:", authError);
-      return NextResponse.json(
-        { error: "Você precisa verificar seu telefone primeiro." },
-        { status: 401 }
-      );
-    }
-
-    const userId = user.id;
-    console.log("Completing registration for user:", userId);
+    const session = await requireAuth();
+    const userId = session.id;
 
     const formData = await req.formData();
 
-    // Extract form data
     const phone = formData.get("phone") as string;
     const countryCode = formData.get("countryCode") as string;
     const nome = formData.get("nome") as string;
@@ -43,55 +22,31 @@ export async function POST(req: Request) {
     const email = formData.get("email") as string | null;
     const selfieFile = formData.get("selfie") as File | null;
 
-    // --- Basic Validation ---
     if (!phone || !nome || !cpf || !profissao || !dataNascimento || !avatarIndex) {
-      return NextResponse.json(
-        { error: "Missing required fields." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Campos obrigatórios faltando." }, { status: 400 });
     }
 
     const formattedPhone = formatPhoneNumber(phone, countryCode);
 
-    // --- Handle Selfie Upload and Avatar URL ---
     let selfieUrl: string | null = null;
     let avatarUrl: string | null = null;
 
-    // 1. Upload Selfie
     if (selfieFile) {
       const selfiePath = `public/selfies/${userId}/${selfieFile.name || "selfie.jpg"}`;
       const { error: uploadError } = await supabaseServer.storage
-        .from("selfies") // Ensure 'selfies' bucket exists and has appropriate policies
+        .from("selfies")
         .upload(selfiePath, selfieFile, { upsert: true });
 
-      if (uploadError) {
-        console.error(`Error uploading selfie for user ${userId}:`, uploadError);
-        // Proceed without selfie for now
-      } else {
-        const { data: urlData } = supabaseServer.storage
-          .from("selfies")
-          .getPublicUrl(selfiePath);
+      if (!uploadError) {
+        const { data: urlData } = supabaseServer.storage.from("selfies").getPublicUrl(selfiePath);
         selfieUrl = urlData?.publicUrl;
-        console.log(`Selfie uploaded for ${userId} to ${selfieUrl}`);
       }
     }
 
-    // 2. Determine Avatar URL (using static paths)
     const index = Number(avatarIndex);
-    if (!isNaN(index) && index >= 0 && index < 9) { // Assuming 9 avatars (0-8)
+    if (!isNaN(index) && index >= 0 && index < 9) {
       avatarUrl = `/images/avatars/avatar_${index + 1}.png`;
-      console.log(`Avatar URL set for ${userId} to ${avatarUrl}`);
-    } else {
-      console.warn(`Invalid avatarIndex received: ${avatarIndex} for user ${userId}`);
     }
-
-    // 3. Create or Update Profile
-    // Check if profile already exists (created by trigger or previous attempt)
-    const { data: existingProfile } = await supabaseServer
-      .from("profiles")
-      .select("id")
-      .eq("id", userId)
-      .maybeSingle();
 
     const profilePayload: any = {
       id: userId,
@@ -102,32 +57,22 @@ export async function POST(req: Request) {
       profissao,
       data_nascimento: dataNascimento,
       verified: true,
-      onboarding_completed: true, // Mark onboarding as complete
+      onboarding_completed: true,
       updated_at: new Date().toISOString(),
     };
 
-    // Add optional fields
     if (email && email.trim() !== "") profilePayload.email = email.trim();
     if (selfieUrl) profilePayload.selfie_url = selfieUrl;
     if (avatarUrl) profilePayload.avatar_url = avatarUrl;
 
-    // Use upsert to handle both creation and updates
     const { error: profileError } = await supabaseServer
       .from("profiles")
       .upsert(profilePayload);
 
     if (profileError) {
-      console.error(`Error creating/updating profile for user ${userId}:`, profileError);
-      return NextResponse.json(
-        { error: "Erro ao salvar perfil do motorista." },
-        { status: 500 }
-      );
+      return safeErrorResponse(profileError, "Erro ao salvar perfil do motorista.");
     }
 
-    // --- Success ---
-    console.log(`Registration completed for user ${userId}`);
-
-    // Check if Stripe account is connected
     const { data: stripeCheck } = await supabaseServer
       .from("profiles")
       .select("stripe_account_id")
@@ -140,14 +85,11 @@ export async function POST(req: Request) {
       userId,
       needsStripeOnboarding,
       redirectTo: needsStripeOnboarding ? '/motorista/stripe-onboarding' : '/motorista/dashboard'
-    }, { status: 200 });
-
-  } catch (err: any) {
-    console.error("Unhandled error in complete-registration:", err);
-    return NextResponse.json(
-      { error: err.message || "Erro interno do servidor." },
-      { status: 500 }
-    );
+    });
+  } catch (error: any) {
+    if (error.name === 'AuthError') {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    return safeErrorResponse(error, "Erro interno do servidor.");
   }
 }
-

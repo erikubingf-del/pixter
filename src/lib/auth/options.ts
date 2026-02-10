@@ -6,7 +6,6 @@ import {
   supabaseAdmin,
   formatPhoneNumber,
 } from "@/lib/supabase/client";
-import Stripe from "stripe";
 
 /* ---------- Row type for `profiles` ---------- */
 interface ProfileRow {
@@ -18,6 +17,7 @@ interface ProfileRow {
   tipo: string | null;
   stripe_account_id: string | null;
   account: string | null;
+  celular: string | null;
 }
 
 /* ---------- Extended user type ---------- */
@@ -25,40 +25,15 @@ interface ExtendedUser extends User {
   id: string;
   email: string;
   tipo: string;
+  phone?: string;
   account?: string;
   name?: string;
   image?: string;
   stripeAccountId?: string;
 }
 
-/* ---------- Stripe ---------- */
-// Lazy-load Stripe to avoid build-time errors
-let _stripe: Stripe | null = null;
-function getStripe(): Stripe {
-  if (_stripe) return _stripe;
-
-  if (!process.env.STRIPE_SECRET_KEY) {
-    throw new Error('Missing STRIPE_SECRET_KEY environment variable');
-  }
-
-  _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: "2022-11-15",
-  });
-  return _stripe;
-}
-const stripe = new Proxy({} as Stripe, {
-  get: (target, prop) => {
-    const client = getStripe();
-    return (client as any)[prop];
-  }
-});
-
-/* ---------- Helper: fetch profile ---------- */
-
 /* ---------- Helper: get profile by email ---------- */
 async function getProfileByEmail(email: string): Promise<ProfileRow | null> {
-  console.log("Going to fetch profile by email:", email);
-
   const { data, error } = await supabaseServer
     .from("profiles")
     .select("*")
@@ -66,15 +41,8 @@ async function getProfileByEmail(email: string): Promise<ProfileRow | null> {
     .maybeSingle();
 
   if (error) {
-    console.error(
-      "Profile fetch by email error:",
-      error.message,
-      error.details
-    );
+    console.error("Profile fetch by email error:", error.message);
     return null;
-  }
-  if (data) {
-    console.log("Profile fetched by email:", data);
   }
   return data as ProfileRow | null;
 }
@@ -100,25 +68,21 @@ export const authOptions: NextAuthOptions = {
         if (!credentials?.email || !credentials?.password) return null;
 
         try {
-          // Use server client for sign-in
           const { data, error } = await supabaseServer.auth.signInWithPassword({
             email: credentials.email,
             password: credentials.password,
           });
 
           if (error || !data.user) {
-            console.error("Email/Password Auth Error:", error?.message);
-            return null; // Return null instead of throwing error
+            return null;
           }
 
-          // Fetch profile using server client
           const { data: profile } = await supabaseServer
             .from("profiles")
             .select("*")
             .eq("id", data.user.id)
             .single();
 
-          // Return user object for NextAuth session
           return {
             id: data.user.id,
             email: data.user.email,
@@ -145,20 +109,16 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.phone || !credentials?.code) {
-          console.error("Missing phone or code in credentials");
           return null;
         }
 
         try {
           const countryCode = credentials.countryCode || "55";
-          // If phone already starts with +, use it directly
           const formattedPhone = credentials.phone.startsWith("+")
             ? credentials.phone
             : formatPhoneNumber(credentials.phone, countryCode);
 
-          console.log("Formatted phone:", formattedPhone);
-
-          // First verify the OTP
+          // Verify OTP
           const { data: verifyData, error: verifyError } =
             await supabaseAdmin.auth.verifyOtp({
               phone: formattedPhone,
@@ -166,25 +126,11 @@ export const authOptions: NextAuthOptions = {
               type: "sms",
             });
 
-          console.log("OTP verification response:", {
-            verifyData,
-            verifyError,
-          });
-
-          if (verifyError) {
-            console.error(
-              `Supabase verifyOtp error for ${formattedPhone}:`,
-              verifyError?.message
-            );
+          if (verifyError || !verifyData?.user) {
             return null;
           }
 
-          if (!verifyData?.user) {
-            console.error("No user data returned from verifyOtp");
-            return null;
-          }
-
-          // Find or create profile
+          // Find profile by ID
           let profile;
           const { data: existingProfile, error: profileError } =
             await supabaseServer
@@ -198,11 +144,8 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
-          // Try to find profile by phone number if no profile found by ID
+          // Try to find profile by phone number if not found by ID
           if (!existingProfile) {
-            console.log("No profile found by ID, checking by phone number...");
-
-            // Get both formats of the phone number for checking
             const phoneWithPlus = formattedPhone.startsWith("+")
               ? formattedPhone
               : `+${formattedPhone}`;
@@ -210,73 +153,40 @@ export const authOptions: NextAuthOptions = {
               ? formattedPhone.substring(1)
               : formattedPhone;
 
-            console.log("Checking for phone formats:", {
-              phoneWithPlus,
-              phoneWithoutPlus,
-            });
-
-            // Check for profile with either phone format
-            const { data: phoneProfile, error: phoneProfileError } =
+            const { data: phoneProfile } =
               await supabaseServer
                 .from("profiles")
                 .select("*")
-                .or(
-                  `celular.eq.${phoneWithPlus},celular.eq.${phoneWithoutPlus}`
-                )
+                .in("celular", [phoneWithPlus, phoneWithoutPlus])
                 .maybeSingle();
 
-            if (phoneProfileError) {
-              console.error(
-                "Error finding profile by phone:",
-                phoneProfileError
-              );
-            } else if (phoneProfile) {
-              console.log("Found profile by phone number:", phoneProfile.id);
+            if (phoneProfile) {
               profile = phoneProfile;
 
-              // Update the auth user ID in the profile to match the authenticated user
-              const { error: updateError } = await supabaseServer
-                .from("profiles")
-                .update({ id: verifyData.user.id })
-                .eq("id", phoneProfile.id);
-
-              if (updateError) {
-                console.error("Error updating profile ID:", updateError);
-              } else {
-                console.log(
-                  "Profile ID updated successfully to:",
-                  verifyData.user.id
-                );
-              }
-
+              // Return with the profile's actual tipo (don't mutate PK)
               return {
                 id: verifyData.user.id,
                 email: phoneProfile.email || "",
                 name: phoneProfile.nome || formattedPhone,
                 image: phoneProfile.avatar_url || "",
-                tipo: "motorista",
+                tipo: phoneProfile.tipo || "motorista",
+                phone: formattedPhone,
                 account: "phone",
                 stripeAccountId: phoneProfile?.stripe_account_id || "",
               };
             }
           }
 
-          // If no profile exists, create a new driver profile automatically
-          let isNewProfile = false;
+          // If no profile exists, create a new driver profile
           if (!existingProfile && !profile) {
-            console.log(
-              "No profile found. Creating new driver profile for:",
-              verifyData.user.id
-            );
-
             const newProfilePayload = {
               id: verifyData.user.id,
               celular: formattedPhone,
               tipo: "motorista",
-              nome: formattedPhone, // Use phone as temporary name
+              nome: formattedPhone,
               account: "phone",
               verified: true,
-              onboarding_completed: false, // Track onboarding status
+              onboarding_completed: false,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             };
@@ -290,37 +200,19 @@ export const authOptions: NextAuthOptions = {
               return null;
             }
 
-            console.log("Driver profile created successfully");
             profile = newProfilePayload;
-            isNewProfile = true;
           } else {
             profile = existingProfile || profile;
           }
 
-          // Ensure profile is motorista type
-          if (profile.tipo !== "motorista") {
-            console.log(
-              "Profile exists but is not motorista. Updating to motorista..."
-            );
-            const { error: updateTypeError } = await supabaseServer
-              .from("profiles")
-              .update({ tipo: "motorista" })
-              .eq("id", verifyData.user.id);
-
-            if (updateTypeError) {
-              console.error("Error updating profile type:", updateTypeError);
-            } else {
-              profile.tipo = "motorista";
-            }
-          }
-
-          // Return user object
+          // Return user with the profile's actual tipo (no forced mutation)
           return {
-            id: profile.id,
+            id: profile.id || verifyData.user.id,
             email: profile.email || "",
             name: profile.nome || formattedPhone,
             image: profile.avatar_url || "",
-            tipo: "motorista",
+            tipo: profile.tipo || "motorista",
+            phone: formattedPhone,
             account: "phone",
             stripeAccountId: profile?.stripe_account_id || "",
           };
@@ -336,7 +228,6 @@ export const authOptions: NextAuthOptions = {
     async signIn({
       user,
       account,
-      profile,
     }: {
       user: ExtendedUser;
       account: any;
@@ -345,19 +236,16 @@ export const authOptions: NextAuthOptions = {
       // Google authentication flow
       if (account?.provider === "google" && user.email) {
         try {
-          console.log("Google auth flow started for email:", user.email);
           const existingProfile = await getProfileByEmail(user.email);
 
           if (existingProfile) {
-            console.log("Using existing profile with ID:", existingProfile.id);
             user.id = existingProfile.id;
             (user as ExtendedUser).tipo = existingProfile.tipo || "cliente";
             (user as ExtendedUser).account = "google";
             return true;
           }
 
-          // 2. For new Google users, create the auth user and profile
-          // Try to create the user - if they already exist, we'll get their ID from the error
+          // Create the auth user
           const { data: authUser, error: authError } =
             await supabaseAdmin.auth.admin.createUser({
               email: user.email,
@@ -369,54 +257,38 @@ export const authOptions: NextAuthOptions = {
             });
 
           if (authError) {
-            // User might already exist - try to find them using Admin API
-            console.log("User might already exist, attempting to find via Admin API");
-
+            // User might already exist - find by email
             try {
-              const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-
-              if (listError || !listData) {
-                console.error("Error listing users:", listError);
-                return true; // Continue with NextAuth session only
-              }
-
-              const userEmail = user.email;
-              if (!userEmail) {
-                console.error("No email provided for user");
-                return true;
-              }
-
-              const existingUser = listData.users?.find((u: any) => u.email === userEmail);
-
-              if (existingUser) {
-                console.log("Found existing user via Admin API:", existingUser.id);
-                user.id = existingUser.id;
+              const { data: userData } = await supabaseAdmin.auth.admin.getUserById(user.id);
+              if (userData?.user) {
+                user.id = userData.user.id;
               } else {
-                console.error("Could not find user after creation failed");
-                return true; // Continue with NextAuth session only
+                // Fallback: query profiles by email
+                const profileByEmail = await getProfileByEmail(user.email);
+                if (profileByEmail) {
+                  user.id = profileByEmail.id;
+                }
               }
             } catch (e) {
               console.error("Exception finding user:", e);
-              return true; // Continue with NextAuth session only
+              return true;
             }
           } else {
-            // Successfully created new user
-            console.log("Successfully created new auth user:", authUser.user.id);
             user.id = authUser.user.id;
           }
 
-          // Create profile
+          // Create profile using upsert to handle duplicates
           try {
             const { error: profileError } = await supabaseServer
               .from("profiles")
-              .insert({
+              .upsert({
                 id: user.id,
                 nome: user.name || "",
                 email: user.email,
                 avatar_url: user.image || null,
                 tipo: "cliente",
                 account: "google",
-              });
+              }, { onConflict: 'id' });
 
             if (profileError) {
               console.error("Profile creation error:", profileError);
@@ -425,14 +297,12 @@ export const authOptions: NextAuthOptions = {
             console.error("Exception during profile creation:", error);
           }
 
-          // Set user type for NextAuth session
           (user as ExtendedUser).tipo = "cliente";
           (user as ExtendedUser).account = "google";
 
           return true;
         } catch (e) {
           console.error("Google auth error:", e);
-          // If all else fails, just let NextAuth handle the session
           return true;
         }
       }
@@ -444,8 +314,9 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.tipo = (user as ExtendedUser).tipo;
         token.account = (user as ExtendedUser).account;
-        token.stripeAccountId = (user as ExtendedUser)?.stripeAccountId|| null;
+        token.stripeAccountId = (user as ExtendedUser)?.stripeAccountId || null;
         token.email = user.email;
+        token.phone = (user as ExtendedUser)?.phone;
       }
       return token;
     },
@@ -455,6 +326,8 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string;
         session.user.tipo = token.tipo as string;
         (session.user as any).account = token.account as string;
+        (session.user as any).phone = token.phone;
+        (session.user as any).stripeAccountId = token.stripeAccountId;
       }
       return session;
     },
@@ -467,10 +340,10 @@ export const authOptions: NextAuthOptions = {
 
   session: {
     strategy: "jwt",
-    maxAge: 24 * 60 * 60, // 1 day in seconds
+    maxAge: 24 * 60 * 60,
   },
 
   jwt: {
-    maxAge: 24 * 60 * 60, // 1 day in seconds
+    maxAge: 24 * 60 * 60,
   },
 };
