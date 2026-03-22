@@ -115,8 +115,8 @@ export default function Login() {
             Bem-vindo de volta
           </h2>
           <p style={{ color: '#52606D', fontSize: '0.95rem' }}>
-            Clientes e motoristas usam o mesmo login. Se sua conta tiver acesso de
-            motorista, vamos te levar direto para a área certa.
+            Clientes e comerciantes usam o mesmo login. Se sua conta tiver acesso de
+            comerciante, vamos te levar direto para a área certa.
           </p>
         </div>
 
@@ -270,7 +270,7 @@ export default function Login() {
                 textDecoration: 'none',
               }}
             >
-              Criar conta de motorista
+              Criar conta de comerciante
             </Link>
           </p>
         </div>

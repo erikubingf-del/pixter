@@ -197,9 +197,9 @@ export default function DriverDashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-0.5">Área do Motorista</p>
+          <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-0.5">Área do Comerciante</p>
           <h1 className="text-xl font-bold text-gray-900">
-            Olá, {profile.nome?.split(' ')[0] || "Motorista"}
+            Olá, {profile.nome?.split(' ')[0] || "Comerciante"}
           </h1>
         </div>
         <button onClick={fetchData} className="flex items-center gap-1.5 text-sm text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors duration-150 cursor-pointer font-medium">

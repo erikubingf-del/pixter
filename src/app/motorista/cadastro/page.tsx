@@ -118,7 +118,7 @@ export default function CadastroMotorista() {
 
       if (!response.ok) throw new Error(data.error || 'Erro ao finalizar cadastro.');
 
-      setSuccess('Área de motorista ativada com sucesso.');
+      setSuccess('Área de comerciante ativada com sucesso.');
       router.push(data.redirectTo || '/motorista/dashboard/overview');
     } catch (submitError: any) {
       setError(submitError.message || 'Erro ao finalizar cadastro.');
@@ -144,7 +144,7 @@ export default function CadastroMotorista() {
     <main className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-2xl rounded-lg bg-white p-8 shadow-md">
         <div className="mb-8 text-center">
-          <h1 className="mb-2 text-3xl font-bold text-gray-900">Ative sua Área de Motorista</h1>
+          <h1 className="mb-2 text-3xl font-bold text-gray-900">Ative sua Área de Comerciante</h1>
           <p className="text-sm text-gray-600">
             Você vai usar o mesmo login da conta atual. Complete seus dados para liberar o Stripe e o seu link de pagamento.
           </p>
@@ -274,7 +274,7 @@ export default function CadastroMotorista() {
               loading || !aceitaTermos ? 'cursor-not-allowed bg-purple-400' : 'bg-purple-600 hover:bg-purple-700'
             }`}
           >
-            {loading ? 'Finalizando onboarding…' : 'Ativar Área de Motorista'}
+            {loading ? 'Finalizando onboarding…' : 'Ativar Área de Comerciante'}
           </button>
         </form>
       </div>

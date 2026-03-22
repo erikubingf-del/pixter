@@ -179,16 +179,16 @@ export default function ClienteDashboardPage() {
             border: '2px solid #C4B5FD'
           }}>
             <p style={{ fontSize: '0.875rem', color: '#4338CA', marginBottom: '0.35rem' }}>
-              Conta com área de motorista ativa
+              Conta com área de comerciante ativa
             </p>
             <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1F2933', marginBottom: '0.5rem' }}>
               Alterne para receber pagamentos e ver analytics
             </h2>
             <p style={{ fontSize: '0.9rem', color: '#4C1D95', marginBottom: '1rem' }}>
-              Sua área do cliente continua separada. Quando quiser receber, use a visão de motorista.
+              Sua área do cliente continua separada. Quando quiser receber, use a visão de comerciante.
             </p>
             <Link href="/motorista/dashboard/overview" className="amo-btn amo-btn-secondary">
-              Abrir área do motorista
+              Abrir área do comerciante
             </Link>
           </div>
         )}

@@ -444,7 +444,7 @@ export default function PaginaPagamento() {
                   }}
                 />
               ) : (
-                profile.nome?.charAt(0).toUpperCase() || 'M'
+                profile.nome?.charAt(0).toUpperCase() || 'C'
               )}
             </div>
 
@@ -716,7 +716,7 @@ function CheckoutForm({
 
         const payload = generatePixPayload({
           pixKey: profile.pix_key!,
-          merchantName: profile.nome || 'Motorista',
+          merchantName: profile.nome || 'Comerciante',
           merchantCity,
           amount: amountInCents / 100, // Convert cents to BRL
           description: profile.company_name || undefined,
@@ -784,7 +784,7 @@ function CheckoutForm({
             {formatAmount(amount)}
           </p>
           <p style={{ fontSize: '0.8rem', color: '#9CA3AF', marginTop: '0.25rem' }}>
-            para {profile.nome || 'Motorista'}
+            para {profile.nome || 'Comerciante'}
           </p>
         </div>
 

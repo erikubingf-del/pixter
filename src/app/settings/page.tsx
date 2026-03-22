@@ -463,7 +463,7 @@ export default function SettingsPage() {
               fontWeight: '700',
               color: '#1F2933'
             }}>
-              {isDriver ? '🚗 Cliente + Motorista/Vendedor' : '💳 Cliente'}
+              {isDriver ? 'Cliente + Comerciante' : 'Cliente'}
             </p>
           </div>
 
@@ -479,7 +479,7 @@ export default function SettingsPage() {
                   Abrir Área do Cliente
                 </Link>
                 <Link href="/motorista/dashboard/overview" className="amo-btn amo-btn-secondary" style={{ textAlign: 'center' }}>
-                  Abrir Área do Motorista
+                  Abrir Área do Comerciante
                 </Link>
               </div>
 
@@ -546,7 +546,7 @@ export default function SettingsPage() {
                   className="amo-btn amo-btn-secondary"
                   style={{ width: '100%' }}
                 >
-                  🚗 Tornar-se Motorista/Vendedor
+                  Tornar-se Comerciante
                 </button>
                 <p style={{
                   fontSize: '0.75rem',
@@ -554,7 +554,7 @@ export default function SettingsPage() {
                   marginTop: '0.5rem',
                   textAlign: 'center'
                 }}>
-                  Você continuará com sua área de cliente e ativará uma área de motorista com onboarding + Stripe Connect.
+                  Você continuará com sua área de cliente e ativará uma área de comerciante com onboarding + Stripe Connect.
                 </p>
               </div>
             </>

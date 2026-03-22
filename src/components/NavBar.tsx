@@ -382,7 +382,7 @@ export default function NavBar() {
                             : "text-gray-600"
                           }`}
                       >
-                        Motorista
+                        Comerciante
                       </Link>
                     </div>
                   )}
@@ -488,7 +488,7 @@ export default function NavBar() {
                           : "bg-gray-100 text-gray-700"
                         }`}
                     >
-                      Motorista
+                      Comerciante
                     </Link>
                   </div>
                 )}

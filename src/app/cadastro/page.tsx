@@ -25,8 +25,8 @@ export default function ClientSignUp() {
         ? {
             title: 'Crie sua conta para receber pagamentos',
             subtitle:
-              'Use o mesmo login para a área do cliente e para ativar sua operação como motorista ou vendedor.',
-            submit: 'Criar conta de motorista',
+              'Use o mesmo login para a área do cliente e para ativar sua operação como comerciante.',
+            submit: 'Criar conta de comerciante',
             alternateCtaLabel: 'Vai apenas pagar?',
             alternateCtaHref: `/cadastro${callbackUrlParam}`,
             alternateCtaText: 'Criar conta de cliente',
@@ -37,7 +37,7 @@ export default function ClientSignUp() {
             submit: 'Criar conta',
             alternateCtaLabel: 'Vai receber pagamentos?',
             alternateCtaHref: driverSignupHref,
-            alternateCtaText: 'Crie sua conta de motorista',
+            alternateCtaText: 'Crie sua conta de comerciante',
           },
     [callbackUrlParam, driverSignupHref, isDriverSignup]
   )
@@ -133,7 +133,7 @@ export default function ClientSignUp() {
 
   const handleGoogleSignIn = async () => {
     if (isDriverSignup) {
-      setError('Cadastro de motorista com Google ainda não está habilitado. Use email e senha para ativar a área de motorista.')
+      setError('Cadastro de comerciante com Google ainda não está habilitado. Use email e senha para ativar a área de comerciante.')
       return
     }
 
