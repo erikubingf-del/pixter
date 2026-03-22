@@ -6,9 +6,19 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "supabase:start": "npx supabase start",
+    "supabase:status": "npx supabase status -o pretty",
+    "supabase:stop": "npx supabase stop",
+    "supabase:use-local-env": "node scripts/use-local-supabase-env.mjs",
+    "health:check": "NODE_NO_WARNINGS=1 node scripts/check-runtime-health.mjs",
+    "seed:qa-users": "node scripts/seed-qa-users.mjs",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@sentry/nextjs": "^10.42.0",
     "@stripe/react-stripe-js": "^2.1.0",
     "@stripe/stripe-js": "^1.54.0",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
@@ -33,14 +43,17 @@
     "@types/next": "^8.0.7",
     "@types/next-auth": "^3.13.0",
     "@types/node": "^20.8.10",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "18.2.33",
     "@types/react-dom": "18.2.14",
     "@types/stripe": "^8.0.416",
+    "@playwright/test": "^1.52.0",
     "autoprefixer": "10.4.16",
     "eslint": "8.52.0",
     "eslint-config-next": "14.0.4",
     "postcss": "8.4.31",
     "tailwindcss": "3.3.5",
-    "typescript": "5.2.2"
+    "typescript": "5.2.2",
+    "vitest": "^3.1.1"
   }
 }
