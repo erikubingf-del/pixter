@@ -17,7 +17,7 @@ export async function GET(
 
     const { data: prof, error } = await supabaseServer
       .from("profiles")
-      .select("id, nome, profissao, avatar_url, stripe_account_id, pix_key, company_name, city, tipo")
+      .select("id, nome, profissao, avatar_url, stripe_account_id, stripe_account_charges_enabled, stripe_account_payouts_enabled, pix_key, company_name, city, tipo")
       .eq("celular", e164)
       .eq("tipo", "motorista")
       .maybeSingle();
@@ -28,8 +28,19 @@ export async function GET(
     if (!prof) {
       return NextResponse.json({ error: "Motorista não encontrado." }, { status: 404 });
     }
-    if (!prof.stripe_account_id && !prof.pix_key) {
-      return NextResponse.json({ error: "Motorista não habilitado para pagamentos." }, { status: 404 });
+
+    const stripeReady = Boolean(
+      prof.stripe_account_id &&
+        prof.stripe_account_charges_enabled &&
+        prof.stripe_account_payouts_enabled
+    );
+    const hasPixKey = !!prof.pix_key;
+
+    if (!hasPixKey) {
+      return NextResponse.json(
+        { error: "Motorista ainda não está pronto para receber pagamentos." },
+        { status: 404 }
+      );
     }
 
     // Return public fields - pix_key is intentionally public (like a bank account for receiving)
@@ -42,8 +53,8 @@ export async function GET(
       company_name: prof.company_name,
       city: prof.city,
       celular: e164,
-      has_stripe: !!prof.stripe_account_id,
-      has_pix: !!prof.pix_key,
+      has_stripe: stripeReady,
+      has_pix: hasPixKey,
       pix_key: prof.pix_key || undefined,
     };
 

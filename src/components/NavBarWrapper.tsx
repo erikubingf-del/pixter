@@ -10,9 +10,9 @@ export default function NavBarWrapper() {
   // Updated regex to match longer phone numbers (8-15 digits)
   // This will match paths like /5511995843051
   const isPhoneNumberPage = /^\/\d{8,15}$/.test(pathname);
-  
-  // Don't render NavBar on phone number pages
-  if (isPhoneNumberPage) {
+
+  // Don't render NavBar on phone number pages or homepage (has its own nav)
+  if (isPhoneNumberPage || pathname === '/') {
     return null;
   }
   

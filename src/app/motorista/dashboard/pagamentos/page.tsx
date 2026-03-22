@@ -1,7 +1,7 @@
 // src/app/motorista/dashboard/pagamentos/page.tsx
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -19,7 +19,7 @@ type BalanceEntry = { amount: string; currency: string };
 type Transaction = {
   id: string;
   chargeId: string | null;
-  data: string;
+  created: string;
   amount: string;
   metodo: string | null;
   cliente: string | null;
@@ -28,8 +28,6 @@ type Transaction = {
   fee?: string;
   status?: string;
 };
-
-type Period = "day" | "week" | "month";
 
 export default function MeusPagamentosPage() {
   const router = useRouter();
@@ -44,9 +42,7 @@ export default function MeusPagamentosPage() {
   const [error, setError] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [period, setPeriod] = useState<Period>("week"); // Default to week as per image
-
-  const fetchPayments = async (start?: string, end?: string) => {
+  const fetchPayments = useCallback(async (start?: string, end?: string) => {
     setLoading(true);
     setError("");
     try {
@@ -59,7 +55,7 @@ export default function MeusPagamentosPage() {
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) {
         if (res.status === 401) {
-          router.push("/motorista/login");
+          router.push("/login");
           return;
         }
         const body = await res.json();
@@ -68,9 +64,6 @@ export default function MeusPagamentosPage() {
 
       const json = await res.json();
       setBalance(json.balance);
-      console.log("Balance:", json.balance);
-      console.log("Transactions:", json.transactions);
-      
       setTransactions(json.transactions);
     } catch (err: any) {
       console.error("Erro ao carregar pagamentos:", err);
@@ -78,12 +71,12 @@ export default function MeusPagamentosPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
   useEffect(() => {
     if (sessionStatus === "loading") return;
     if (sessionStatus === "unauthenticated") {
-      router.push("/motorista/login");
+      router.push("/login");
     } else {
       // Set initial date range for the last week
       const today = new Date();
@@ -95,7 +88,7 @@ export default function MeusPagamentosPage() {
       setEndDate(initialEndDate);
       fetchPayments(initialStartDate, initialEndDate);
     }
-  }, [sessionStatus, router]);
+  }, [fetchPayments, router, sessionStatus]);
 
   const handleFilter = () => {
     fetchPayments(startDate, endDate);
@@ -108,7 +101,7 @@ export default function MeusPagamentosPage() {
       parseFloat(v.replace(/[^\d,-]/g, "").replace(",", "."));
 
     transactions.forEach((t) => {
-      const date = new Date(t.data);
+      const date = new Date(t.created);
       const label = date.toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit' }); // Format as DD/MM
       map[label] = (map[label] || 0) + parseValue(t.amount);
     });
@@ -148,7 +141,7 @@ export default function MeusPagamentosPage() {
     <div className="p-4 md:p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header section - Assuming NavBar is handled in layout */}
       {/* <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Pixter</h1>
+        <h1 className="text-3xl font-bold text-gray-800">AmoPagar</h1>
         <nav className="space-x-4">
           <Link href="/motorista/dashboard/dados" className="text-gray-600 hover:text-gray-900">Meus Dados</Link>
           <Link href="/motorista/dashboard/pagina-pagamento" className="text-gray-600 hover:text-gray-900">Minha Página de Pagamento</Link>
@@ -213,7 +206,7 @@ export default function MeusPagamentosPage() {
                   {transactions.map((t) => (
                     <tr key={t.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                        {new Date(t.data).toLocaleDateString("pt-BR")}
+                        {new Date(t.created).toLocaleDateString("pt-BR")}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{t.amount}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">

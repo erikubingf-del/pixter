@@ -7,14 +7,20 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        purple: {
-          600: '#6200EA',
-          700: '#5600E8',
+        brand: {
+          purple: '#6C5DD3',    // Default primary purple
+          'purple-light': '#8A7CEB', // Lighter purple for hover/gradients
+          'purple-dark': '#5549B8',  // Darker purple for active/pressed
+          cyan: '#00C9A7',      // Primary cyan/teal
+          'cyan-dark': '#00A388', // Darker cyan
+          text: '#111827',      // Main heading color
+          muted: '#52606D',     // Subtitle text color
+          background: '#F8F9FA' // Light page background
         }
       },
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
-        heading: ['Montserrat', 'sans-serif'],
+        sans: ['IBM Plex Sans', 'var(--font-ibm-plex-sans)', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        heading: ['IBM Plex Sans', 'var(--font-ibm-plex-sans)', 'sans-serif'],
       },
     },
   },

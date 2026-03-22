@@ -1,506 +1,283 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { formatCPF, validateCPF, getCPFValidationError } from '@/lib/validators/cpf';
+import { useSession } from 'next-auth/react';
+import AvatarGridSelector from '@/components/AvatarGridSelector';
+import { isDriverOnboardingComplete } from '@/lib/auth/driver-profile';
+import { formatCPF, getCPFValidationError, validateCPF } from '@/lib/validators/cpf';
+
+const avatarOptions = Array.from({ length: 9 }, (_, index) => `/images/avatars/avatar_${index + 1}.png`);
+
+type ProfileResponse = {
+  id: string;
+  nome?: string | null;
+  email?: string | null;
+  celular?: string | null;
+  cpf?: string | null;
+  profissao?: string | null;
+  data_nascimento?: string | null;
+  avatar_url?: string | null;
+  onboarding_completed?: boolean;
+  stripe_ready?: boolean;
+};
 
 export default function CadastroMotorista() {
   const router = useRouter();
+  const { data: session, status } = useSession();
 
-  /* ──────────────── Estados ──────────────── */
-  const [step, setStep] = useState<'phone' | 'details'>('phone');
-
-  // telefone / OTP
   const [phone, setPhone] = useState('');
   const [countryCode] = useState('55');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [codeSent, setCodeSent] = useState(false);
-  const [countdown, setCountdown] = useState(0);
-
-  // dados pessoais
   const [nomeCompleto, setNomeCompleto] = useState('');
   const [email, setEmail] = useState('');
   const [cpf, setCpf] = useState('');
   const [profissao, setProfissao] = useState('Motorista de táxi');
   const [dataNascimento, setDataNascimento] = useState('');
   const [aceitaTermos, setAceitaTermos] = useState(false);
-
-  // selfie + avatar
-  const [selfieCapturada, setSelfieCapturada] = useState(false);
-  const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
   const [selectedAvatar, setSelectedAvatar] = useState(0);
-  const [showAvatarSelection, setShowAvatarSelection] = useState(false);
-  const [cameraAtiva, setCameraAtiva] = useState(false);
-
-  // UI
   const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  /* ──────────────── Refs ──────────────── */
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  /* ──────────────── Avatares ──────────────── */
-  const avatars = Array.from({ length: 9 }, (_, i) => `/images/avatars/avatar_${i + 1}.png`);
-
-  /* ──────────────── Efeitos ──────────────── */
-  // countdown
   useEffect(() => {
-    if (countdown <= 0) return;
-    const t = setInterval(() => setCountdown((n) => (n <= 1 ? (clearInterval(t), 0) : n - 1)), 1000);
-    return () => clearInterval(t);
-  }, [countdown]);
-
-  // limpar câmera ao desmontar
-  useEffect(
-    () => () => {
-      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
-    },
-    []
-  );
-
-  /* ──────────────── API: enviar / verificar código ──────────────── */
-  const enviarCodigoVerificacao = async () => {
-    if (!phone) return setError('Informe o número');
-    try {
-      setLoading(true);
-      setError('');
-      const res = await fetch('/api/auth/send-verification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, countryCode })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Falha ao enviar código');
-      setCodeSent(true);
-      setCountdown(60);
-      setSuccess('Código enviado! Verifique o WhatsApp.');
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
+    if (status === 'unauthenticated') {
+      router.replace('/login?callbackUrl=%2Fmotorista%2Fcadastro');
+      return;
     }
-  };
 
-  const verificarCodigo = async () => {
-    if (!verificationCode) return setError('Informe o código');
-    try {
-      setLoading(true);
-      setError('');
+    if (status !== 'authenticated') return;
 
-      // Use the same verification endpoint as driver login
-      const res = await fetch('/api/auth/verify-otp-registration', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, code: verificationCode, countryCode })
-      });
-
-      // Handle response text first to avoid JSON parse errors
-      const text = await res.text();
-      if (!text) {
-        throw new Error('Servidor não respondeu corretamente. Tente novamente.');
-      }
-
-      let data;
+    const hydrateProfile = async () => {
       try {
-        data = JSON.parse(text);
-      } catch (parseErr) {
-        console.error('Failed to parse response:', text);
-        throw new Error('Resposta inválida do servidor. Tente novamente.');
+        setInitializing(true);
+        const response = await fetch('/api/profile');
+        if (!response.ok) throw new Error('Não foi possível carregar seus dados.');
+
+        const data = await response.json();
+        const profile = (data.profile || {}) as ProfileResponse;
+
+        if (isDriverOnboardingComplete(profile) && profile.onboarding_completed) {
+          router.replace(profile.stripe_ready ? '/motorista/dashboard/overview' : '/motorista/stripe-onboarding');
+          return;
+        }
+
+        setNomeCompleto(profile.nome || session?.user?.name || '');
+        setEmail(profile.email || session?.user?.email || '');
+        setPhone(profile.celular ? profile.celular.replace(/^\+55/, '') : '');
+        setCpf(profile.cpf || '');
+        setProfissao(profile.profissao || 'Motorista de táxi');
+        setDataNascimento(profile.data_nascimento || '');
+        if (profile.avatar_url) {
+          const avatarIndex = avatarOptions.findIndex((avatar) => avatar === profile.avatar_url);
+          if (avatarIndex >= 0) setSelectedAvatar(avatarIndex);
+        }
+      } catch (profileError: any) {
+        setError(profileError.message || 'Não foi possível carregar seu perfil.');
+      } finally {
+        setInitializing(false);
       }
+    };
 
-      if (!res.ok) throw new Error(data.error || 'Código inválido');
-      setStep('details');
-      setSuccess('Telefone verificado!');
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
+    hydrateProfile();
+  }, [router, session?.user?.email, session?.user?.name, status]);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (!nomeCompleto || !phone || !cpf || !profissao || !dataNascimento) {
+      setError('Preencha todos os campos obrigatórios.');
+      return;
     }
-  };
 
-  /* ──────────────── Câmera & Selfie ──────────────── */
-  const iniciarCamera = async () => {
-    setCameraAtiva(true); // garante que o <video> seja renderizado antes
-    try {
-      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play().catch(console.error);
-        };
-      }
-    } catch (e) {
-      setError('Não foi possível acessar a câmera');
-      setCameraAtiva(false);
-    }
-  };
-
-  const capturarSelfie = () => {
-    if (!videoRef.current || !canvasRef.current) return setError('Erro ao capturar selfie');
-    const v = videoRef.current;
-    const c = canvasRef.current;
-    c.width = v.videoWidth || 640;
-    c.height = v.videoHeight || 480;
-    const ctx = c.getContext('2d');
-    ctx?.drawImage(v, 0, 0, c.width, c.height);
-    const dataUrl = c.toDataURL('image/jpeg', 0.8);
-    setSelfiePreview(dataUrl);
-    setSelfieCapturada(true);
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-    setCameraAtiva(false);
-    setShowAvatarSelection(true);
-  };
-
-  const reiniciarCamera = () => {
-    setSelfieCapturada(false);
-    setSelfiePreview(null);
-    setShowAvatarSelection(false);
-    iniciarCamera();
-  };
-
-  /* ──────────────── Helpers ──────────────── */
-  const dataURLtoBlob = (dataURL: string) => {
-    const [meta, b64] = dataURL.split(',');
-    const mime = meta.match(/:(.*?);/)?.[1] || 'image/jpeg';
-    const bin = atob(b64);
-    const arr = new Uint8Array(bin.length);
-    arr.forEach((_, i) => (arr[i] = bin.charCodeAt(i)));
-    return new Blob([arr], { type: mime });
-  };
-
-  /* ──────────────── Submit final ──────────────── */
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nomeCompleto || !cpf || !dataNascimento) return setError('Preencha todos os campos obrigatórios');
-
-    // Validate CPF
     const cpfError = getCPFValidationError(cpf);
-    if (cpfError) return setError(cpfError);
+    if (cpfError) { setError(cpfError); return; }
 
-    if (!selfieCapturada) return setError('Capture uma selfie');
-    if (!aceitaTermos) return setError('Aceite os termos');
+    if (!aceitaTermos) {
+      setError('Você precisa aceitar os termos para continuar.');
+      return;
+    }
+
     try {
       setLoading(true);
-      const fd = new FormData();
-      fd.append('phone', phone);
-      fd.append('countryCode', countryCode);
-      fd.append('nome', nomeCompleto);
-      fd.append('profissao', profissao);
-      fd.append('dataNascimento', dataNascimento);
-      fd.append('cpf', cpf);
-      if (email) fd.append('email', email);
-      fd.append('avatarIndex', selectedAvatar.toString());
-      if (selfiePreview) fd.append('selfie', new File([dataURLtoBlob(selfiePreview)], 'selfie.jpg'));
-      const res = await fetch('/api/auth/complete-registration', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro ao finalizar cadastro');
+      const formData = new FormData();
+      formData.append('phone', phone);
+      formData.append('countryCode', countryCode);
+      formData.append('nome', nomeCompleto);
+      formData.append('profissao', profissao);
+      formData.append('dataNascimento', dataNascimento);
+      formData.append('cpf', cpf);
+      if (email) formData.append('email', email);
+      formData.append('avatarIndex', selectedAvatar.toString());
 
-      // Redirect based on Stripe onboarding status
-      const redirectPath = data.redirectTo || '/motorista/dashboard';
-      router.push(redirectPath);
-    } catch (e: any) {
-      setError(e.message);
+      const response = await fetch('/api/auth/complete-registration', { method: 'POST', body: formData });
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error || 'Erro ao finalizar cadastro.');
+
+      setSuccess('Área de motorista ativada com sucesso.');
+      router.push(data.redirectTo || '/motorista/dashboard/overview');
+    } catch (submitError: any) {
+      setError(submitError.message || 'Erro ao finalizar cadastro.');
     } finally {
       setLoading(false);
     }
   };
 
-  /* ──────────────── Render condicional ──────────────── */
-  const renderStepContent = () => {
-    if (step === 'phone') {
-      return (
-        <div className="space-y-6">
-          <h2 className="text-2xl font-bold text-center">Cadastro de Motorista</h2>
-          <p className="text-center text-gray-600">Informe seu número de WhatsApp para começar</p>
+  if (status === 'loading' || initializing) {
+    return (
+      <main className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-purple-200 border-t-purple-600" />
+          <p className="text-sm text-gray-500">Carregando onboarding…</p>
+        </div>
+      </main>
+    );
+  }
 
-          {/* telefone */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp (com DDD)</label>
-            <div className="flex">
-              <span className="inline-flex items-center px-3 bg-gray-100 border border-r-0 border-gray-300 rounded-l-md text-gray-500">
-                +{countryCode}
-              </span>
+  if (!session) return null;
+
+  return (
+    <main className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-2xl rounded-lg bg-white p-8 shadow-md">
+        <div className="mb-8 text-center">
+          <h1 className="mb-2 text-3xl font-bold text-gray-900">Ative sua Área de Motorista</h1>
+          <p className="text-sm text-gray-600">
+            Você vai usar o mesmo login da conta atual. Complete seus dados para liberar o Stripe e o seu link de pagamento.
+          </p>
+        </div>
+
+        {error && (
+          <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        )}
+        {success && (
+          <div className="mb-4 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{success}</div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Nome completo</label>
               <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="11 98765-4321"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-r-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                type="text"
+                value={nomeCompleto}
+                onChange={(event) => setNomeCompleto(event.target.value)}
+                required
+                autoComplete="name"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Email da conta</label>
+              <input
+                type="email"
+                value={email}
+                readOnly
+                disabled
+                className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-gray-500"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Celular (com DDD)</label>
+              <div className="flex">
+                <span className="inline-flex items-center rounded-l-md border border-r-0 border-gray-300 bg-gray-100 px-3 text-gray-500">
+                  +{countryCode}
+                </span>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  placeholder="11 98765-4321"
+                  required
+                  autoComplete="tel"
+                  className="flex-1 rounded-r-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">CPF</label>
+              <input
+                type="text"
+                value={cpf}
+                onChange={(event) => setCpf(formatCPF(event.target.value))}
+                onBlur={() => { const e = getCPFValidationError(cpf); setError(e || ''); }}
+                required
+                placeholder="000.000.000-00"
+                maxLength={14}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              {cpf && !validateCPF(cpf) && cpf.replace(/\D/g, '').length === 11 && (
+                <p className="mt-1 text-xs text-red-600">CPF inválido</p>
+              )}
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Profissão</label>
+              <input
+                type="text"
+                value={profissao}
+                onChange={(event) => setProfissao(event.target.value)}
+                required
+                className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Data de nascimento</label>
+              <input
+                type="date"
+                value={dataNascimento}
+                onChange={(event) => setDataNascimento(event.target.value)}
+                required
+                className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
           </div>
 
-          {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">{error}</div>}
-          {success && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">{success}</div>}
+          <AvatarGridSelector
+            currentAvatarUrl={avatarOptions[selectedAvatar]}
+            onSelect={(avatarUrl) => {
+              const avatarIndex = avatarOptions.findIndex((avatar) => avatar === avatarUrl);
+              if (avatarIndex >= 0) setSelectedAvatar(avatarIndex);
+            }}
+            loading={loading}
+          />
+
+          <div className="flex items-start">
+            <input
+              id="aceita"
+              type="checkbox"
+              checked={aceitaTermos}
+              onChange={(event) => setAceitaTermos(event.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+              required
+            />
+            <label htmlFor="aceita" className="ml-2 text-sm text-gray-700">
+              Aceito os{' '}
+              <Link href="/termos" className="text-purple-600 hover:text-purple-800">Termos de Uso</Link>
+              {' '}e a{' '}
+              <Link href="/privacidade" className="text-purple-600 hover:text-purple-800">Política de Privacidade</Link>
+            </label>
+          </div>
 
           <button
-            type="button"
-            onClick={enviarCodigoVerificacao}
-            disabled={loading || !phone}
-            className={`w-full bg-purple-600 text-white py-3 px-4 rounded-md font-medium transition ${
-              loading || !phone ? 'opacity-70 cursor-not-allowed' : 'hover:bg-purple-700'
+            type="submit"
+            disabled={loading || !aceitaTermos}
+            className={`w-full rounded-md px-4 py-3 font-medium text-white transition ${
+              loading || !aceitaTermos ? 'cursor-not-allowed bg-purple-400' : 'bg-purple-600 hover:bg-purple-700'
             }`}
           >
-            {loading ? 'Enviando…' : 'Enviar código de verificação'}
+            {loading ? 'Finalizando onboarding…' : 'Ativar Área de Motorista'}
           </button>
-
-          {codeSent && (
-            <div className="mt-4">
-              <div className="flex space-x-4">
-                <input
-                  type="text"
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value)}
-                  placeholder="Digite o código"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-
-                <button
-                  type="button"
-                  onClick={verificarCodigo}
-                  disabled={loading || !verificationCode}
-                  className={`bg-blue-600 text-white px-4 py-2 rounded-md font-medium transition ${
-                    loading || !verificationCode ? 'opacity-70 cursor-not-allowed' : 'hover:bg-blue-700'
-                  }`}
-                >
-                  {loading ? 'Verificando…' : 'Verificar'}
-                </button>
-              </div>
-
-              {countdown > 0 ? (
-                <p className="text-sm text-gray-500 mt-2">Reenviar código em {countdown}s</p>
-              ) : (
-                <button
-                  type="button"
-                  onClick={enviarCodigoVerificacao}
-                  disabled={loading}
-                  className="text-sm text-purple-600 hover:text-purple-800 mt-2"
-                >
-                  Reenviar código
-                </button>
-              )}
-            </div>
-          )}
-
-          <p className="text-center text-sm text-gray-500">
-            Já tem uma conta?{' '}
-            <Link href="/motorista/login" className="text-purple-600 hover:text-purple-800">
-              Acesse aqui
-            </Link>
-          </p>
-        </div>
-      );
-    }
-
-    /* ---------- Detalhes + Selfie + Avatar ---------- */
-    return (
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <h2 className="text-2xl font-bold text-center">Complete seu cadastro</h2>
-
-        {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">{error}</div>}
-
-        {/* dados pessoais */}
-        <div className="space-y-4">
-          {/* nome */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nome completo</label>
-            <input
-              type="text"
-              value={nomeCompleto}
-              onChange={(e) => setNomeCompleto(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
-          </div>
-
-          {/* email */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email (opcional)</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
-          </div>
-
-          {/* CPF */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">CPF</label>
-            <input
-              type="text"
-              value={cpf}
-              onChange={(e) => {
-                const formatted = formatCPF(e.target.value);
-                setCpf(formatted);
-              }}
-              onBlur={() => {
-                // Validate on blur and show error if invalid
-                const error = getCPFValidationError(cpf);
-                if (error && cpf.length > 0) {
-                  setError(error);
-                } else {
-                  setError('');
-                }
-              }}
-              required
-              placeholder="000.000.000-00"
-              maxLength={14}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
-            {cpf && !validateCPF(cpf) && cpf.replace(/\D/g, '').length === 11 && (
-              <p className="text-xs text-red-600 mt-1">CPF inválido</p>
-            )}
-          </div>
-
-          {/* profissão */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Profissão</label>
-            <input
-              type="text"
-              value={profissao}
-              onChange={(e) => setProfissao(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
-          </div>
-
-          {/* data de nascimento */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Data de nascimento</label>
-            <input
-              type="date"
-              value={dataNascimento}
-              onChange={(e) => setDataNascimento(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
-          </div>
-        </div>
-
-        {/* selfie + avatar */}
-        <div className="space-y-4">
-          {!selfieCapturada ? (
-            <>
-              {!cameraAtiva ? (
-                <button
-                  type="button"
-                  onClick={iniciarCamera}
-                  className="w-full bg-blue-600 text-white py-2 px-4 rounded-md font-medium hover:bg-blue-700"
-                >
-                  Iniciar câmera
-                </button>
-              ) : (
-                <>
-                  <div className="relative w-full h-64 bg-gray-100 rounded-md overflow-hidden">
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={capturarSelfie}
-                    className="w-full bg-green-600 text-white py-2 px-4 rounded-md font-medium hover:bg-green-700"
-                  >
-                    Capturar selfie
-                  </button>
-                </>
-              )}
-              <canvas ref={canvasRef} className="hidden" />
-            </>
-          ) : (
-            <>
-              <div className="flex justify-center">
-                <div className="relative w-48 h-48 bg-gray-100 rounded-full overflow-hidden">
-                  {selfiePreview && <img src={selfiePreview} alt="Selfie" className="absolute inset-0 w-full h-full object-cover" />}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={reiniciarCamera}
-                className="w-full bg-gray-600 text-white py-2 px-4 rounded-md font-medium hover:bg-gray-700"
-              >
-                Tirar nova selfie
-              </button>
-            </>
-          )}
-
-          {showAvatarSelection && (
-            <div className="space-y-4">
-              <h4 className="text-md font-medium">Escolha seu avatar</h4>
-              <div className="grid grid-cols-3 gap-4">
-                {avatars.map((avatar, idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => setSelectedAvatar(idx)}
-                    className={`relative rounded-full overflow-hidden border-4 cursor-pointer ${
-                      selectedAvatar === idx ? 'border-purple-500' : 'border-transparent'
-                    }`}
-                  >
-                    <img
-                      src={avatar}
-                      alt={`Avatar ${idx + 1}`}
-                      onError={(e) => ((e.target as HTMLImageElement).src = '/images/avatar-placeholder.png')}
-                      className="w-full h-auto"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* termos */}
-        <div className="flex items-start">
-          <input
-            id="aceita"
-            type="checkbox"
-            checked={aceitaTermos}
-            onChange={(e) => setAceitaTermos(e.target.checked)}
-            className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded mt-1"
-            required
-          />
-          <label htmlFor="aceita" className="ml-2 text-sm text-gray-700">
-            Aceito os{' '}
-            <Link href="/termos" className="text-purple-600 hover:text-purple-800">
-              Termos de Uso
-            </Link>{' '}
-            e a{' '}
-            <Link href="/privacidade" className="text-purple-600 hover:text-purple-800">
-              Política de Privacidade
-            </Link>
-          </label>
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading || !aceitaTermos || !selfieCapturada}
-          className={`w-full bg-purple-600 text-white py-3 px-4 rounded-md font-medium transition ${
-            loading || !aceitaTermos || !selfieCapturada ? 'opacity-70 cursor-not-allowed' : 'hover:bg-purple-700'
-          }`}
-        >
-          {loading ? 'Criando conta…' : 'Criar conta'}
-        </button>
-      </form>
-    );
-  };
-
-  /* ──────────────── JSX principal ──────────────── */
-  return (
-    <main className="min-h-screen bg-gray-50 flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8">{renderStepContent()}</div>
+        </form>
+      </div>
     </main>
   );
 }

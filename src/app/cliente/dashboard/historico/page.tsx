@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -25,15 +25,7 @@ export default function HistoricoPage() {
   const [endDate, setEndDate] = useState('')
   const [search, setSearch] = useState('')
 
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login')
-    } else if (status === 'authenticated') {
-      fetchPayments()
-    }
-  }, [status])
-
-  const fetchPayments = async (params?: { start?: string; end?: string; q?: string }) => {
+  const fetchPayments = useCallback(async (params?: { start?: string; end?: string; q?: string }) => {
     setLoading(true)
     setError('')
     try {
@@ -54,7 +46,15 @@ export default function HistoricoPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [endDate, search, startDate])
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login')
+    } else if (status === 'authenticated') {
+      fetchPayments()
+    }
+  }, [fetchPayments, router, status])
 
   const handleFilter = () => {
     fetchPayments({ start: startDate, end: endDate, q: search })

@@ -1,0 +1,32 @@
+# Dependencies (reinstalled inside Docker)
+node_modules
+
+# Build output (rebuilt inside Docker)
+.next
+out
+
+# Git
+.git
+.gitignore
+
+# Local env files (NEVER bake secrets into image)
+.env
+.env.*
+!.env.example
+
+# Dev/doc files
+*.md
+docs/
+*.py
+*.png
+*.sql
+*.txt
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/client'
 import { rateLimit } from '@/middleware/rate-limit'
+import { brlToCents } from '@/lib/utils/payment'
 
 /**
  * Creates a pending Pix payment record when QR code is generated
@@ -30,8 +31,8 @@ export async function POST(request: Request) {
     }
 
     // Validate amount
-    const amountInBRL = parseFloat(valor)
-    if (isNaN(amountInBRL) || amountInBRL <= 0) {
+    const amountInCents = brlToCents(valor)
+    if (!Number.isFinite(amountInCents) || amountInCents <= 0) {
       return NextResponse.json(
         { error: 'Invalid amount' },
         { status: 400 }
@@ -49,12 +50,12 @@ export async function POST(request: Request) {
       .insert({
         motorista_id: motorista_id,
         cliente_id: null, // Guest payment
-        valor: amountInBRL,
+        valor: amountInCents,
         moeda: 'brl',
         status: 'pending', // Pending confirmation from driver
         metodo: 'pix',
         application_fee_amount: 0, // No fee for Pix
-        net_amount: amountInBRL, // Driver gets 100%
+        net_amount: amountInCents, // Driver gets 100%
         receipt_number: receiptNumber,
         stripe_payment_id: null, // No Stripe for Pix
         descricao: 'Pagamento via Pix - Aguardando confirmação',

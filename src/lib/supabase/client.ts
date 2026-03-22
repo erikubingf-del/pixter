@@ -11,6 +11,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Placeholder values for build time
 const buildTimeUrl = 'https://placeholder.supabase.co';
+const buildTimeAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2MDAwMDAwMDAsImV4cCI6MTkwMDAwMDAwMH0.placeholder';
 const buildTimeServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTYwMDAwMDAwMCwiZXhwIjoxOTAwMDAwMDAwfQ.placeholder';
 
 /*──────────────── SERVER CLIENT (service role) ────────────────────────────*/
@@ -26,6 +27,19 @@ export const supabaseServer = createClient(
 );
 
 export const supabaseAdmin = supabaseServer;
+
+export function createServerAuthClient() {
+  return createClient(
+    supabaseUrl || buildTimeUrl,
+    supabaseAnonKey || buildTimeAnonKey,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      }
+    }
+  );
+}
 
 /*──────────────── BROWSER CLIENT (anon key) ────────────────────────────*/
 export function createBrowserClient() {
@@ -144,7 +158,7 @@ export const createDriverWithPhone = async (
     if (dupEmailData) return { error: new Error('email_exists') };
   }
 
-  const email = emailProvided ?? `${sanitizedPhoneDigits}-${Date.now()}@pixter-temp.com`;
+  const email = emailProvided ?? `${sanitizedPhoneDigits}-${Date.now()}@amopagar-temp.com`;
   const password = Math.random().toString(36).slice(-10) + Math.random().toString(36).slice(-10);
 
   const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.createUser({

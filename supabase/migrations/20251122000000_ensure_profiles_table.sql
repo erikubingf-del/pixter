@@ -106,7 +106,7 @@ CREATE TRIGGER trigger_update_profiles_updated_at
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO profiles (id, email, tipo, created_at, updated_at)
+  INSERT INTO public.profiles (id, email, tipo, created_at, updated_at)
   VALUES (
     NEW.id,
     NEW.email,

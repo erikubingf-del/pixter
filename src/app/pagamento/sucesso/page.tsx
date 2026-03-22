@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import PostPaymentSignup from '@/components/PostPaymentSignup'
 
 export default function PaymentSuccess() {
   const router = useRouter()
@@ -14,7 +13,6 @@ export default function PaymentSuccess() {
   const [paymentIntentId, setPaymentIntentId] = useState('')
   const [amount, setAmount] = useState(0)
   const [vendorName, setVendorName] = useState('')
-  const [showSignupModal, setShowSignupModal] = useState(false)
   const [email, setEmail] = useState('')
   const [emailSent, setEmailSent] = useState(false)
   const [emailSending, setEmailSending] = useState(false)
@@ -45,16 +43,6 @@ export default function PaymentSuccess() {
     if (amountParam) setAmount(parseInt(amountParam))
     if (vendorParam) setVendorName(decodeURIComponent(vendorParam))
   }, [searchParams])
-
-  // Auto-show modal for guest users after 2 seconds
-  useEffect(() => {
-    if (status === 'unauthenticated' && paymentIntentId) {
-      const timer = setTimeout(() => {
-        setShowSignupModal(true)
-      }, 2000)
-      return () => clearTimeout(timer)
-    }
-  }, [status, paymentIntentId])
 
   const copyTransactionId = async () => {
     try {
@@ -228,12 +216,18 @@ export default function PaymentSuccess() {
               <p className="text-center text-sm text-purple-700 mb-3">
                 Crie sua conta grátis para acessar todos os seus recibos e pagamentos.
               </p>
-              <button
-                onClick={() => setShowSignupModal(true)}
-                className="w-full py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700"
+              <Link
+                href="/cadastro"
+                className="w-full inline-flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700"
               >
                 Criar Conta Grátis
-              </button>
+              </Link>
+              <Link
+                href="/login?callbackUrl=%2Fcliente%2Fdashboard"
+                className="mt-3 w-full inline-flex justify-center py-2.5 px-4 border border-purple-300 rounded-md text-sm font-medium text-purple-700 bg-white hover:bg-purple-50"
+              >
+                Já tenho conta
+              </Link>
               <p className="text-center text-xs text-purple-600 mt-2">
                 Use a referência <span className="font-mono font-bold">{transactionRef}</span> para vincular este pagamento depois.
               </p>
@@ -257,19 +251,6 @@ export default function PaymentSuccess() {
           </div>
         </div>
       </main>
-
-      {/* Post-Payment Signup Modal */}
-      {showSignupModal && paymentIntentId && (
-        <PostPaymentSignup
-          paymentIntentId={paymentIntentId}
-          amount={amount}
-          vendorName={vendorName || 'Vendedor'}
-          onClose={() => setShowSignupModal(false)}
-          onSuccess={() => {
-            setShowSignupModal(false)
-          }}
-        />
-      )}
     </>
   )
 }

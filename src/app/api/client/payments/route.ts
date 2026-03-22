@@ -3,6 +3,8 @@ import { requireCliente } from '@/lib/auth/get-session';
 import { supabaseServer } from '@/lib/supabase/client';
 import { safeErrorResponse } from '@/lib/utils/api-error';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   try {
     const session = await requireCliente();

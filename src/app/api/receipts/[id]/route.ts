@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
 import puppeteer from "puppeteer";
-import stripe from "@/lib/stripe/server";
+import stripe, { calculateFee } from "@/lib/stripe/server";
 import { supabaseServer } from "@/lib/supabase/client";
 import { requireAuth } from "@/lib/auth/get-session";
 import { escapeHtml } from "@/lib/utils/html-escape";
 import { safeErrorResponse } from "@/lib/utils/api-error";
+import { getPublicPaymentUrl } from "@/lib/utils/payment";
 
 export const dynamic = 'force-dynamic';
 
-const PIXTER_FEE_PERCENTAGE = 0.04;
-const COMPANY_NAME = "Pixter";
+const COMPANY_NAME = "AmoPagar";
 const COMPANY_SUBTITLE = "Pagamentos Digitais Ltda.";
-const FOOTER_TEXT = "Obrigado por usar Pixter. Volte sempre!";
+const FOOTER_TEXT = "Obrigado por usar AmoPagar. Volte sempre!";
 
 function formatCurrency(value: number, currency: string = "brl"): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency, currencyDisplay: "symbol" }).format(value / 100);
@@ -74,7 +74,7 @@ function getDriverReceiptHtml(details: any): string {
 <div class="item"><span>Cliente:</span><span>${escapeHtml(details.client_identifier)}</span></div>
 <div class="item"><span>Método:</span><span>${escapeHtml(details.method)}</span></div><hr>
 <div class="item"><span>Valor Bruto Recebido:</span><span>${escapeHtml(details.amount_original_formatted)}</span></div>
-<div class="item fee"><span>Taxa Pixter (${escapeHtml(details.fee_percentage)}%):</span><span>- ${escapeHtml(details.pixter_fee_formatted)}</span></div><hr>
+<div class="item fee"><span>Taxa AmoPagar (${escapeHtml(details.fee_percentage)}%):</span><span>- ${escapeHtml(details.platform_fee_formatted)}</span></div><hr>
 <div class="item net"><span>Valor Líquido Recebido:</span><span>${escapeHtml(details.net_amount_formatted)}</span></div>
 <div class="footer">${escapeHtml(FOOTER_TEXT)}</div>
 <div class="footer">ID: ${escapeHtml(details.transaction_id)} | Gerado em: ${escapeHtml(formatDateTimeFooter())}</div>
@@ -163,16 +163,18 @@ export async function GET(
       if (profile) driverProfile = { ...profile, stripe_account_id: stripeAccountId };
     }
 
-    const driverName = driverProfile?.nome || "Motorista Pixter";
+    const driverName = driverProfile?.nome || "Motorista";
     const driverProfession = driverProfile?.profissao || "Profissional";
     const driverPhone = driverProfile?.celular?.replace(/\D/g, '') || null;
     const driverCpfMasked = maskCpf(driverProfile?.cpf);
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "pixter.com";
-    const paymentLink = driverPhone ? `${appUrl}/${driverPhone}` : "Link Indisponível";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const paymentLink = driverPhone ? getPublicPaymentUrl(appUrl, driverPhone) : "Link Indisponível";
 
     const originalAmount = charge.amount;
-    const pixterFee = Math.round(originalAmount * PIXTER_FEE_PERCENTAGE);
-    const netAmount = originalAmount - pixterFee;
+    // Use actual Stripe application fee when available (Connect charges); fallback to configured platform fee formula.
+    const platformFee = charge.application_fee_amount ?? calculateFee(originalAmount);
+    const netAmount = originalAmount - platformFee;
+    const feePercentage = originalAmount > 0 ? ((platformFee / originalAmount) * 100).toFixed(1) : "0.0";
     const clientIdentifier = charge.billing_details?.email || charge.billing_details?.name || "Cliente Anônimo";
 
     const receiptDetails = {
@@ -185,8 +187,8 @@ export async function GET(
       method: getPaymentMethodDetails(charge),
       amount_paid_formatted: formatCurrency(originalAmount, charge.currency),
       amount_original_formatted: formatCurrency(originalAmount, charge.currency),
-      pixter_fee_formatted: formatCurrency(pixterFee, charge.currency),
-      fee_percentage: (PIXTER_FEE_PERCENTAGE * 100).toFixed(0),
+      platform_fee_formatted: formatCurrency(platformFee, charge.currency),
+      fee_percentage: feePercentage,
       net_amount_formatted: formatCurrency(netAmount, charge.currency),
       payment_link: paymentLink,
     };
@@ -195,6 +197,7 @@ export async function GET(
 
     const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
     const page = await browser.newPage();
+    page.setDefaultNavigationTimeout(30000);
     await page.setContent(htmlContent, { waitUntil: "networkidle0" });
     const pdfBuffer = await page.pdf({ format: "A4", printBackground: true });
     await browser.close();

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import stripe from "@/lib/stripe/server";
+import { summarizeStripeAccount } from "@/lib/stripe/connect";
 import { supabaseServer } from "@/lib/supabase/client";
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -191,7 +192,7 @@ async function handleChargeRefunded(charge: any) {
 }
 
 async function handleAccountUpdated(account: any) {
-  const { id, metadata, charges_enabled, details_submitted, payouts_enabled } = account;
+  const { id, metadata } = account;
   const supabaseUserId = metadata?.supabaseUserId;
 
   if (!supabaseUserId) {
@@ -200,18 +201,15 @@ async function handleAccountUpdated(account: any) {
   }
 
   try {
-    let accountStatus = "pending";
-    if (details_submitted) {
-      accountStatus = charges_enabled && payouts_enabled ? "verified" : "restricted";
-    }
+    const summary = summarizeStripeAccount(account);
 
     const { error: updateError } = await supabaseServer
       .from("profiles")
       .update({
-        stripe_account_charges_enabled: charges_enabled,
-        stripe_account_details_submitted: details_submitted,
-        stripe_account_payouts_enabled: payouts_enabled,
-        stripe_account_status: accountStatus,
+        stripe_account_charges_enabled: summary.charges_enabled,
+        stripe_account_details_submitted: summary.details_submitted,
+        stripe_account_payouts_enabled: summary.payouts_enabled,
+        stripe_account_status: summary.status,
         updated_at: new Date().toISOString(),
       })
       .eq("id", supabaseUserId);

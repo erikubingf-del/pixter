@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session?.user?.email) {
+    if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -27,21 +27,44 @@ export async function POST(request: Request) {
       )
     }
 
-    // If converting to cliente, remove Stripe connection
+    const { data: currentProfile, error: currentProfileError } = await supabaseServer
+      .from('profiles')
+      .select('id, tipo, stripe_account_id, onboarding_completed')
+      .eq('id', session.user.id)
+      .single()
+
+    if (currentProfileError || !currentProfile) {
+      return NextResponse.json(
+        { error: 'Failed to load current profile' },
+        { status: 500 }
+      )
+    }
+
+    if (
+      tipo === 'cliente' &&
+      (currentProfile.tipo === 'motorista' ||
+        currentProfile.onboarding_completed ||
+        currentProfile.stripe_account_id)
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'A conta de motorista permanece ativa. Use a navegação para alternar entre a área do cliente e a área do motorista.',
+        },
+        { status: 400 }
+      )
+    }
+
     const updateData: any = {
       tipo,
       updated_at: new Date().toISOString()
-    }
-
-    if (tipo === 'cliente') {
-      updateData.stripe_account_id = null
     }
 
     // Update profile
     const { data: profile, error } = await supabaseServer
       .from('profiles')
       .update(updateData)
-      .eq('email', session.user.email)
+      .eq('id', session.user.id)
       .select()
       .single()
 

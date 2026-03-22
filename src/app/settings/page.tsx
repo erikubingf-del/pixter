@@ -19,6 +19,9 @@ interface Profile {
   company_name: string | null
   address: string | null
   city: string | null
+  stripe_account_status: string | null
+  can_use_driver_view?: boolean
+  stripe_ready?: boolean
 }
 
 export default function SettingsPage() {
@@ -115,44 +118,8 @@ export default function SettingsPage() {
     }
   }
 
-  // Convert account type
-  const handleAccountTypeToggle = async (newType: 'cliente' | 'motorista') => {
-    if (!profile) return
-
-    const confirmMessage = newType === 'motorista'
-      ? 'Deseja se tornar um motorista/vendedor? Você precisará conectar sua conta Stripe para receber pagamentos.'
-      : '⚠️ Converter para cliente removerá sua conexão com Stripe e desativará seu link de pagamento. Deseja continuar?'
-
-    if (!confirm(confirmMessage)) return
-
-    try {
-      setSaving(true)
-      setError('')
-
-      const res = await fetch('/api/profile/toggle-type', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tipo: newType })
-      })
-
-      if (!res.ok) {
-        throw new Error('Failed to update account type')
-      }
-
-      const data = await res.json()
-      setProfile(data.profile)
-      setSuccess(`✅ Conta convertida para ${newType === 'motorista' ? 'Motorista' : 'Cliente'}!`)
-
-      // Refresh page after 1 second
-      setTimeout(() => {
-        window.location.reload()
-      }, 1000)
-    } catch (err: any) {
-      console.error('Error toggling account type:', err)
-      setError('Falha ao converter tipo de conta')
-    } finally {
-      setSaving(false)
-    }
+  const handleActivateDriver = () => {
+    router.push('/motorista/cadastro')
   }
 
   // Connect Stripe
@@ -161,7 +128,7 @@ export default function SettingsPage() {
       setSaving(true)
       setError('')
 
-      const res = await fetch('/api/stripe/create-connect-account', {
+      const res = await fetch('/api/stripe/connect-account', {
         method: 'POST'
       })
 
@@ -211,8 +178,9 @@ export default function SettingsPage() {
     return null
   }
 
-  const isDriver = profile.tipo === 'motorista'
-  const isStripeConnected = isDriver && profile.stripe_account_id
+  const isDriver = Boolean(profile.can_use_driver_view || profile.tipo === 'motorista')
+  const isStripeConnected = Boolean(isDriver && profile.stripe_ready)
+  const backHref = isDriver ? '/motorista/dashboard/overview' : '/cliente/dashboard'
 
   return (
     <main style={{
@@ -243,7 +211,7 @@ export default function SettingsPage() {
               Gerencie seu perfil e preferências
             </p>
           </div>
-          <Link href="/cliente/dashboard" className="amo-btn amo-btn-outline">
+          <Link href={backHref} className="amo-btn amo-btn-outline">
             ← Voltar ao Dashboard
           </Link>
         </div>
@@ -495,12 +463,26 @@ export default function SettingsPage() {
               fontWeight: '700',
               color: '#1F2933'
             }}>
-              {isDriver ? '🚗 Motorista/Vendedor' : '💳 Cliente'}
+              {isDriver ? '🚗 Cliente + Motorista/Vendedor' : '💳 Cliente'}
             </p>
           </div>
 
           {isDriver ? (
             <>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '0.75rem',
+                marginBottom: '1.5rem'
+              }}>
+                <Link href="/cliente/dashboard" className="amo-btn amo-btn-outline" style={{ textAlign: 'center' }}>
+                  Abrir Área do Cliente
+                </Link>
+                <Link href="/motorista/dashboard/overview" className="amo-btn amo-btn-secondary" style={{ textAlign: 'center' }}>
+                  Abrir Área do Motorista
+                </Link>
+              </div>
+
               {/* Stripe Section */}
               <div style={{
                 background: isStripeConnected ? '#D1FAE5' : '#FEE2E2',
@@ -532,8 +514,8 @@ export default function SettingsPage() {
                   marginBottom: '1rem'
                 }}>
                   {isStripeConnected
-                    ? 'Sua conta Stripe está conectada e ativa!'
-                    : 'Conecte sua conta Stripe para receber pagamentos'}
+                    ? 'Sua conta Stripe está pronta e seu link de pagamento pode operar.'
+                    : 'Seu link de pagamento fica bloqueado até a Stripe liberar a conta para cobrar e repassar.'}
                 </p>
                 {!isStripeConnected && (
                   <button
@@ -546,37 +528,6 @@ export default function SettingsPage() {
                   </button>
                 )}
               </div>
-
-              {/* Convert to Client */}
-              <div>
-                <p style={{
-                  fontSize: '0.875rem',
-                  color: '#52606D',
-                  marginBottom: '1rem'
-                }}>
-                  Quer apenas usar como cliente?
-                </p>
-                <button
-                  onClick={() => handleAccountTypeToggle('cliente')}
-                  disabled={saving}
-                  className="amo-btn amo-btn-outline"
-                  style={{
-                    width: '100%',
-                    borderColor: '#DC2626',
-                    color: '#DC2626'
-                  }}
-                >
-                  Converter para Cliente
-                </button>
-                <p style={{
-                  fontSize: '0.75rem',
-                  color: '#DC2626',
-                  marginTop: '0.5rem',
-                  textAlign: 'center'
-                }}>
-                  ⚠️ Isto removerá sua conexão Stripe
-                </p>
-              </div>
             </>
           ) : (
             <>
@@ -587,10 +538,10 @@ export default function SettingsPage() {
                   color: '#52606D',
                   marginBottom: '1rem'
                 }}>
-                  Quer receber pagamentos?
+                  Quer receber pagamentos com o mesmo login?
                 </p>
                 <button
-                  onClick={() => handleAccountTypeToggle('motorista')}
+                  onClick={handleActivateDriver}
                   disabled={saving}
                   className="amo-btn amo-btn-secondary"
                   style={{ width: '100%' }}
@@ -603,7 +554,7 @@ export default function SettingsPage() {
                   marginTop: '0.5rem',
                   textAlign: 'center'
                 }}>
-                  Você precisará conectar sua conta Stripe
+                  Você continuará com sua área de cliente e ativará uma área de motorista com onboarding + Stripe Connect.
                 </p>
               </div>
             </>

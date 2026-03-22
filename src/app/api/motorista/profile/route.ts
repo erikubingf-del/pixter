@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { requireMotorista } from "@/lib/auth/get-session";
+import { hasDriverCapability, requireMotorista } from "@/lib/auth/get-session";
 import { supabaseServer } from "@/lib/supabase/client";
 import { safeErrorResponse } from "@/lib/utils/api-error";
+import { validatePixKey } from "@/lib/pix/generator";
 
 export const dynamic = 'force-dynamic';
 
@@ -14,9 +15,8 @@ export async function GET() {
 
     const { data: profile, error } = await supabaseServer
       .from("profiles")
-      .select("id, nome, email, celular, tipo, profissao, stripe_account_id, stripe_account_status, avatar_url")
+      .select("id, nome, email, celular, tipo, profissao, stripe_account_id, stripe_account_status, stripe_account_charges_enabled, stripe_account_payouts_enabled, avatar_url, pix_key")
       .eq("id", userId)
-      .eq("tipo", "motorista")
       .single();
 
     if (error) {
@@ -73,7 +73,18 @@ export async function GET() {
       return safeErrorResponse(error, "Erro ao buscar perfil do motorista");
     }
 
-    return NextResponse.json(profile);
+    const canUseDriverView = await hasDriverCapability(userId);
+    const stripeReady = Boolean(
+      profile.stripe_account_id &&
+        profile.stripe_account_charges_enabled &&
+        profile.stripe_account_payouts_enabled
+    );
+
+    return NextResponse.json({
+      ...profile,
+      can_use_driver_view: canUseDriverView,
+      stripe_ready: stripeReady,
+    });
   } catch (error: any) {
     if (error.name === 'AuthError') {
       return NextResponse.json({ error: error.message }, { status: error.status });
@@ -112,6 +123,15 @@ export async function PUT(request: Request) {
         return NextResponse.json({ error: "URL de avatar inválida." }, { status: 400 });
       }
     }
+    if (updates.hasOwnProperty("pix_key")) {
+      if (updates.pix_key === null || updates.pix_key === '') {
+        allowedUpdates.pix_key = null;
+      } else if (typeof updates.pix_key === 'string' && validatePixKey(updates.pix_key.trim())) {
+        allowedUpdates.pix_key = updates.pix_key.trim();
+      } else {
+        return NextResponse.json({ error: "Chave Pix inválida. Verifique o formato e tente novamente." }, { status: 400 });
+      }
+    }
 
     if (Object.keys(allowedUpdates).length === 0) {
       return NextResponse.json({ error: "Nenhum campo válido para atualização fornecido." }, { status: 400 });
@@ -123,15 +143,26 @@ export async function PUT(request: Request) {
       .from("profiles")
       .update(allowedUpdates)
       .eq("id", userId)
-      .eq("tipo", "motorista")
-      .select("id, nome, email, celular, tipo, profissao, stripe_account_id, stripe_account_status, avatar_url")
+      .select("id, nome, email, celular, tipo, profissao, stripe_account_id, stripe_account_status, stripe_account_charges_enabled, stripe_account_payouts_enabled, avatar_url, pix_key")
       .single();
 
     if (error) {
       return safeErrorResponse(error, "Erro ao atualizar perfil do motorista");
     }
 
-    return NextResponse.json({ success: true, message: "Perfil atualizado com sucesso", profile: data });
+    return NextResponse.json({
+      success: true,
+      message: "Perfil atualizado com sucesso",
+      profile: {
+        ...data,
+        can_use_driver_view: await hasDriverCapability(userId),
+        stripe_ready: Boolean(
+          data.stripe_account_id &&
+            data.stripe_account_charges_enabled &&
+            data.stripe_account_payouts_enabled
+        ),
+      },
+    });
   } catch (error: any) {
     if (error.name === 'AuthError') {
       return NextResponse.json({ error: error.message }, { status: error.status });

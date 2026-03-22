@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import QRCode from 'qrcode';
 import { Check, Copy, Loader2 } from 'lucide-react';
 
@@ -177,9 +178,12 @@ export default function PixPayment({
       <div className="flex justify-center">
         <div className="bg-white p-4 rounded-lg border-2 border-gray-200">
           {pixQrCode && (
-            <img
+            <Image
               src={pixQrCode}
               alt="QR Code Pix"
+              width={256}
+              height={256}
+              unoptimized
               className="w-64 h-64"
             />
           )}

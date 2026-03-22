@@ -1,6 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase/client';
 import { safeErrorResponse } from '@/lib/utils/api-error';
+import { rateLimit } from '@/middleware/rate-limit';
+import { normalizeRequestedAccountType } from '@/lib/auth/driver-profile';
 
 /**
  * POST /api/auth/signup-client
@@ -9,10 +11,20 @@ import { safeErrorResponse } from '@/lib/utils/api-error';
  *
  * After signup, the user must verify their email, then log in via NextAuth.
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown';
+    const rl = await rateLimit(`signup-client:${ip}`, 5, 3600000); // 5 signups/hour per IP
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: 'Muitas tentativas de cadastro. Aguarde antes de tentar novamente.' },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
-    const { name, email, password, celular, cpf } = body;
+    const { name, email, password, celular, cpf, accountType } = body;
+    const normalizedAccountType = normalizeRequestedAccountType(accountType);
 
     if (!name || !email || !password) {
       return NextResponse.json(
@@ -48,7 +60,7 @@ export async function POST(request: Request) {
       email_confirm: false, // User must verify email
       user_metadata: {
         nome: name,
-        tipo: 'cliente',
+        tipo: normalizedAccountType,
         celular: celular || null,
         cpf: cpf || null,
       },
@@ -98,7 +110,7 @@ export async function POST(request: Request) {
         id: authData.user.id,
         nome: name,
         email,
-        tipo: 'cliente',
+        tipo: normalizedAccountType,
         celular: celular || null,
         cpf: cpf || null,
         updated_at: new Date().toISOString(),

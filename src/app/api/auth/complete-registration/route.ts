@@ -20,7 +20,6 @@ export async function POST(req: Request) {
     const dataNascimento = formData.get("dataNascimento") as string;
     const avatarIndex = formData.get("avatarIndex") as string;
     const email = formData.get("email") as string | null;
-    const selfieFile = formData.get("selfie") as File | null;
 
     if (!phone || !nome || !cpf || !profissao || !dataNascimento || !avatarIndex) {
       return NextResponse.json({ error: "Campos obrigatórios faltando." }, { status: 400 });
@@ -28,20 +27,7 @@ export async function POST(req: Request) {
 
     const formattedPhone = formatPhoneNumber(phone, countryCode);
 
-    let selfieUrl: string | null = null;
     let avatarUrl: string | null = null;
-
-    if (selfieFile) {
-      const selfiePath = `public/selfies/${userId}/${selfieFile.name || "selfie.jpg"}`;
-      const { error: uploadError } = await supabaseServer.storage
-        .from("selfies")
-        .upload(selfiePath, selfieFile, { upsert: true });
-
-      if (!uploadError) {
-        const { data: urlData } = supabaseServer.storage.from("selfies").getPublicUrl(selfiePath);
-        selfieUrl = urlData?.publicUrl;
-      }
-    }
 
     const index = Number(avatarIndex);
     if (!isNaN(index) && index >= 0 && index < 9) {
@@ -62,7 +48,6 @@ export async function POST(req: Request) {
     };
 
     if (email && email.trim() !== "") profilePayload.email = email.trim();
-    if (selfieUrl) profilePayload.selfie_url = selfieUrl;
     if (avatarUrl) profilePayload.avatar_url = avatarUrl;
 
     const { error: profileError } = await supabaseServer
@@ -75,16 +60,19 @@ export async function POST(req: Request) {
 
     const { data: stripeCheck } = await supabaseServer
       .from("profiles")
-      .select("stripe_account_id")
+      .select("stripe_account_id, stripe_account_charges_enabled, stripe_account_payouts_enabled")
       .eq("id", userId)
       .single();
 
-    const needsStripeOnboarding = !stripeCheck?.stripe_account_id;
+    const needsStripeOnboarding =
+      !stripeCheck?.stripe_account_id ||
+      !stripeCheck?.stripe_account_charges_enabled ||
+      !stripeCheck?.stripe_account_payouts_enabled;
 
     return NextResponse.json({
       userId,
       needsStripeOnboarding,
-      redirectTo: needsStripeOnboarding ? '/motorista/stripe-onboarding' : '/motorista/dashboard'
+      redirectTo: needsStripeOnboarding ? '/motorista/stripe-onboarding' : '/motorista/dashboard/overview'
     });
   } catch (error: any) {
     if (error.name === 'AuthError') {

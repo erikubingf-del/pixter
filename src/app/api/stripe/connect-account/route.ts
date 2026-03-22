@@ -1,83 +1,97 @@
-import { NextResponse } from "next/server";
-import stripe from "@/lib/stripe/server";
-import { requireAuth } from "@/lib/auth/get-session";
-import { supabaseServer } from "@/lib/supabase/client";
-import { safeErrorResponse } from "@/lib/utils/api-error";
+import { NextResponse } from 'next/server';
+import { requireMotorista } from '@/lib/auth/get-session';
+import { supabaseServer } from '@/lib/supabase/client';
+import {
+  createStripeOnboardingLink,
+  ensureStripeConnectAccount,
+  getPendingStripeSummary,
+  resetStripeConnectState,
+  syncStripeAccountState,
+} from '@/lib/stripe/connect';
+import { safeErrorResponse } from '@/lib/utils/api-error';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+async function handleConnectAccount() {
   try {
-    const session = await requireAuth();
-    const userId = session.id;
-    const userEmail = session.email;
+    const session = await requireMotorista();
 
     const { data: profile, error: profileError } = await supabaseServer
-      .from("profiles")
-      .select("stripe_account_id")
-      .eq("id", userId)
+      .from('profiles')
+      .select('id, email, nome, celular, stripe_account_id')
+      .eq('id', session.id)
       .single();
 
-    if (profileError && profileError.code === "PGRST116") {
-      return NextResponse.json({ error: "Perfil não encontrado." }, { status: 404 });
+    if (profileError && profileError.code === 'PGRST116') {
+      return NextResponse.json({ error: 'Perfil não encontrado.' }, { status: 404 });
     }
     if (profileError) {
-      return safeErrorResponse(profileError, "Erro ao buscar perfil.");
+      return safeErrorResponse(profileError, 'Erro ao buscar perfil.');
     }
 
-    let stripeAccountId = profile?.stripe_account_id;
+    let stripeAccountId = profile.stripe_account_id;
 
     if (!stripeAccountId) {
-      if (!userEmail) {
-        return NextResponse.json({ error: "Email do usuário não encontrado." }, { status: 400 });
-      }
+      stripeAccountId = await ensureStripeConnectAccount(profile);
+      const accountLink = await createStripeOnboardingLink(stripeAccountId);
 
-      // Double-click protection: re-check before creating
-      const { data: recheck } = await supabaseServer
-        .from("profiles")
-        .select("stripe_account_id")
-        .eq("id", userId)
-        .single();
-
-      if (recheck?.stripe_account_id) {
-        stripeAccountId = recheck.stripe_account_id;
-      } else {
-        const account = await stripe.accounts.create({
-          type: "express",
-          email: userEmail,
-          capabilities: {
-            card_payments: { requested: true },
-            transfers: { requested: true },
-          },
-          business_type: "individual",
-          metadata: { supabaseUserId: userId },
-        });
-        stripeAccountId = account.id;
-
-        const { error: updateError } = await supabaseServer
-          .from("profiles")
-          .update({ stripe_account_id: stripeAccountId })
-          .eq("id", userId);
-
-        if (updateError) {
-          return safeErrorResponse(updateError, "Falha ao salvar informações do Stripe.");
-        }
-      }
+      return NextResponse.json({
+        ...getPendingStripeSummary(),
+        url: accountLink.url,
+        accountId: stripeAccountId,
+      });
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pixter-mu.vercel.app";
-    const accountLink = await stripe.accountLinks.create({
-      account: stripeAccountId,
-      refresh_url: `${appUrl}/motorista/stripe-refresh`,
-      return_url: `${appUrl}/motorista/stripe-success`,
-      type: "account_onboarding",
-    });
+    try {
+      const { summary } = await syncStripeAccountState(profile.id, stripeAccountId);
 
-    return NextResponse.json({ url: accountLink.url });
+      if (summary.ready) {
+        return NextResponse.json({
+          ...summary,
+          url: null,
+          accountId: stripeAccountId,
+        });
+      }
+
+      const accountLink = await createStripeOnboardingLink(stripeAccountId);
+
+      return NextResponse.json({
+        ...summary,
+        url: accountLink.url,
+        accountId: stripeAccountId,
+      });
+    } catch (error: any) {
+      if (error?.code === 'account_invalid') {
+        await resetStripeConnectState(profile.id);
+
+        stripeAccountId = await ensureStripeConnectAccount({
+          ...profile,
+          stripe_account_id: null,
+        });
+
+        const accountLink = await createStripeOnboardingLink(stripeAccountId);
+
+        return NextResponse.json({
+          ...getPendingStripeSummary(),
+          url: accountLink.url,
+          accountId: stripeAccountId,
+        });
+      }
+
+      throw error;
+    }
   } catch (error: any) {
     if (error.name === 'AuthError') {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
-    return safeErrorResponse(error, "Erro ao conectar com Stripe.");
+    return safeErrorResponse(error, 'Erro ao conectar com Stripe.');
   }
+}
+
+export async function GET() {
+  return handleConnectAccount();
+}
+
+export async function POST() {
+  return handleConnectAccount();
 }

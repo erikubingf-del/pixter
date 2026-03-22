@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
     const { data: driverProfile, error: profileError } = await supabaseServer
       .from("profiles")
-      .select("id, stripe_account_id, stripe_account_charges_enabled")
+      .select("id, stripe_account_id, stripe_account_charges_enabled, stripe_account_payouts_enabled")
       .eq("celular", formattedPhone)
       .eq("tipo", "motorista")
       .maybeSingle();
@@ -41,35 +41,48 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Motorista não encontrado ou não habilitado para pagamentos." }, { status: 404 });
     }
 
-    if (driverProfile.stripe_account_charges_enabled === false) {
-      return NextResponse.json({ error: "Conta do motorista ainda não está ativa para receber pagamentos." }, { status: 400 });
+    const stripeReady = Boolean(
+      driverProfile.stripe_account_charges_enabled &&
+        driverProfile.stripe_account_payouts_enabled
+    );
+
+    if (!stripeReady) {
+      return NextResponse.json(
+        { error: "Conta do motorista ainda não está totalmente verificada para receber pagamentos." },
+        { status: 400 }
+      );
     }
 
     const applicationFee = calculateFee(amountInCents);
 
     // Check if user is logged in and has a saved Stripe customer
     let customerId: string | undefined;
-    let ephemeralKey: string | undefined;
     const session = await getServerSession(authOptions);
     if (session?.user?.id) {
       const { data: userProfile } = await supabaseServer
         .from("profiles")
-        .select("stripe_customer_id, default_payment_method")
+        .select("stripe_customer_id, default_payment_method, email, nome")
         .eq("id", session.user.id)
-        .single();
+        .maybeSingle();
 
       if (userProfile?.stripe_customer_id) {
         customerId = userProfile.stripe_customer_id;
-        // Create ephemeral key for the customer so Stripe Elements can show saved cards
-        try {
-          const ek = await stripe.ephemeralKeys.create(
-            { customer: customerId },
-            { apiVersion: "2022-11-15" }
-          );
-          ephemeralKey = ek.secret;
-        } catch {
-          // Non-critical: proceed without saved cards
-        }
+      } else {
+        const customer = await stripe.customers.create({
+          email: userProfile?.email || session.user.email || undefined,
+          name: userProfile?.nome || session.user.name || undefined,
+          metadata: { supabaseUserId: session.user.id },
+        });
+
+        customerId = customer.id;
+
+        await supabaseServer
+          .from("profiles")
+          .update({
+            stripe_customer_id: customerId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", session.user.id);
       }
     }
 
@@ -88,6 +101,7 @@ export async function POST(request: Request) {
         ...(session?.user?.id ? { clienteId: session.user.id } : {}),
       },
       ...(customerId ? { customer: customerId } : {}),
+      ...(customerId ? { setup_future_usage: "off_session" } : {}),
     };
 
     const paymentIntent = await stripe.paymentIntents.create(piParams);
@@ -95,7 +109,6 @@ export async function POST(request: Request) {
     return NextResponse.json({
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
-      ...(ephemeralKey ? { ephemeralKeySecret: ephemeralKey } : {}),
       ...(customerId ? { customerId } : {}),
     });
   } catch (error: unknown) {

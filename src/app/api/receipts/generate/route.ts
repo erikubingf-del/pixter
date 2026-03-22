@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     }
 
     // Amount is in cents, convert for display
-    const amountForDisplay = typeof payment.valor === 'number' ? payment.valor / 100 : parseFloat(payment.valor);
+    const amountForDisplay = Number(payment.valor) / 100;
 
     const receiptData: ReceiptData = {
       receiptNumber: payment.receipt_number,

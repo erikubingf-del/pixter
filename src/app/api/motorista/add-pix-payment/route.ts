@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseServer } from '@/lib/supabase/client'
 import { rateLimit } from '@/middleware/rate-limit'
+import { brlToCents } from '@/lib/utils/payment'
 
 export const dynamic = 'force-dynamic';
 
@@ -44,8 +45,8 @@ export async function POST(request: Request) {
     }
 
     // Validate amount
-    const amountInBRL = parseFloat(valor)
-    if (isNaN(amountInBRL) || amountInBRL <= 0) {
+    const amountInCents = brlToCents(valor)
+    if (!Number.isFinite(amountInCents) || amountInCents <= 0) {
       return NextResponse.json(
         { error: 'Invalid amount' },
         { status: 400 }
@@ -86,12 +87,12 @@ export async function POST(request: Request) {
       .insert({
         motorista_id: profile.id,
         cliente_id: null, // Guest payment
-        valor: amountInBRL,
+        valor: amountInCents,
         moeda: 'brl',
         status: 'succeeded', // Manually confirmed by driver
         metodo: 'pix',
         application_fee_amount: 0, // No fee for Pix
-        net_amount: amountInBRL, // Driver gets 100%
+        net_amount: amountInCents, // Driver gets 100%
         receipt_number: receiptNumber,
         stripe_payment_id: null, // No Stripe for Pix
         descricao: descricao || 'Pagamento via Pix',

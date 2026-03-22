@@ -51,6 +51,25 @@ END $$;
 -- PROFILES: Create a safe public view for driver info (payment pages)
 -- ============================================================================
 
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'profiles'
+      AND column_name = 'city'
+  ) THEN
+    ALTER TABLE profiles ADD COLUMN city TEXT;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'profiles'
+      AND column_name = 'company_name'
+  ) THEN
+    ALTER TABLE profiles ADD COLUMN company_name TEXT;
+  END IF;
+END $$;
+
 -- This view exposes only safe fields for public-facing pages
 CREATE OR REPLACE VIEW public_driver_profiles AS
 SELECT

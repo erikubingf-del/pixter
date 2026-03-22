@@ -4,6 +4,8 @@ import { supabaseServer } from '@/lib/supabase/client';
 import stripe from '@/lib/stripe/server';
 import { safeErrorResponse } from '@/lib/utils/api-error';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const session = await requireCliente();

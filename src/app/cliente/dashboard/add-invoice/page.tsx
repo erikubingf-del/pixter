@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { ArrowLeft, Search, CheckCircle, XCircle, Loader2 } from 'lucide-react'
+import { formatCentsToBrl } from '@/lib/utils/payment'
 
 export default function AddInvoicePage() {
   const router = useRouter()
@@ -70,10 +71,7 @@ export default function AddInvoicePage() {
 
   // Format currency
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(amount)
+    return formatCentsToBrl(amount)
   }
 
   // Format date
@@ -173,7 +171,7 @@ export default function AddInvoicePage() {
               <ul className="text-sm text-blue-700 space-y-1">
                 <li>• Abra o print/screenshot do comprovante de pagamento</li>
                 <li>• O número está no formato: <strong>PIX-1234567890-ABC123</strong></li>
-                <li>• Pode aparecer como "Número do Recibo" ou "Invoice Number"</li>
+                <li>• Pode aparecer como &quot;Número do Recibo&quot; ou &quot;Invoice Number&quot;</li>
                 <li>• Digite exatamente como aparece no comprovante</li>
               </ul>
             </div>
@@ -234,7 +232,7 @@ export default function AddInvoicePage() {
               <div className="space-y-2 text-sm text-gray-600">
                 <details className="cursor-pointer">
                   <summary className="font-medium text-gray-700 hover:text-purple-600">
-                    "Comprovante não encontrado"
+                    &quot;Comprovante não encontrado&quot;
                   </summary>
                   <p className="mt-2 pl-4">
                     Verifique se digitou o número corretamente. O número diferencia maiúsculas de minúsculas.
@@ -244,7 +242,7 @@ export default function AddInvoicePage() {
 
                 <details className="cursor-pointer">
                   <summary className="font-medium text-gray-700 hover:text-purple-600">
-                    "Comprovante já vinculado"
+                    &quot;Comprovante já vinculado&quot;
                   </summary>
                   <p className="mt-2 pl-4">
                     Este comprovante já está vinculado a uma conta. Verifique se você já adicionou este pagamento
@@ -254,7 +252,7 @@ export default function AddInvoicePage() {
 
                 <details className="cursor-pointer">
                   <summary className="font-medium text-gray-700 hover:text-purple-600">
-                    "Não consigo encontrar o número"
+                    &quot;Não consigo encontrar o número&quot;
                   </summary>
                   <p className="mt-2 pl-4">
                     O número do recibo aparece no comprovante de pagamento que você recebeu após pagar.

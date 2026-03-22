@@ -1,64 +1,75 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import Link from 'next/link'
 import '../../../styles/amopagar-theme.css'
+import { formatCentsToBrl } from '@/lib/utils/payment'
 
-interface Payment {
+type Payment = {
   id: string
   created_at: string
   valor: number
   metodo: string | null
-  receipt_number: string
-  receipt_pdf_url: string | null
-  receipt_url: string | null
-  is_business_expense: boolean
+  status: string
   motorista: {
     nome: string
   } | null
 }
 
-interface Profile {
-  tipo: 'cliente' | 'motorista'
-  stripe_account_id: string | null
-  pix_key: string | null
-  celular: string | null
+type Profile = {
+  nome: string | null
+  can_use_driver_view?: boolean
 }
 
-interface StripeStatus {
-  connected: boolean
-  charges_enabled: boolean
-  payouts_enabled: boolean
-  details_submitted: boolean
-  requirements?: {
-    currently_due: string[]
-    eventually_due: string[]
-    past_due: string[]
-  }
-}
+const quickActions = [
+  {
+    href: '/cliente/dashboard/historico',
+    title: 'Histórico',
+    description: 'Veja todos os pagamentos e comprovantes.',
+    icon: (
+      <svg width="20" height="20" fill="none" stroke="#6C5DD3" strokeWidth="1.75" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    ),
+  },
+  {
+    href: '/cliente/payment-methods',
+    title: 'Meus cartões',
+    description: 'Gerencie os cartões salvos para pagar mais rápido.',
+    icon: (
+      <svg width="20" height="20" fill="none" stroke="#6C5DD3" strokeWidth="1.75" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" />
+      </svg>
+    ),
+  },
+  {
+    href: '/settings',
+    title: 'Configurações',
+    description: 'Atualize seus dados e preferências da conta.',
+    icon: (
+      <svg width="20" height="20" fill="none" stroke="#6C5DD3" strokeWidth="1.75" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    ),
+  },
+]
 
-export default function UnifiedDashboard() {
+export default function ClienteDashboardPage() {
   const router = useRouter()
   const { data: session, status } = useSession()
-
-  const [payments, setPayments] = useState<Payment[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null)
+  const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [showQRCode, setShowQRCode] = useState(false)
-  const [qrCodeUrl, setQrCodeUrl] = useState('')
 
-  // Redirect if not authenticated
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login')
     }
-  }, [status, router])
+  }, [router, status])
 
-  // Fetch profile and payments
   useEffect(() => {
     const fetchData = async () => {
       if (status !== 'authenticated') return
@@ -67,32 +78,23 @@ export default function UnifiedDashboard() {
         setLoading(true)
         setError('')
 
-        // Fetch profile
-        let profileData: any = null
-        const profileRes = await fetch('/api/profile')
-        if (profileRes.ok) {
-          profileData = await profileRes.json()
-          setProfile(profileData.profile)
+        const [profileRes, paymentsRes] = await Promise.all([
+          fetch('/api/profile'),
+          fetch('/api/client/payments'),
+        ])
+
+        if (!profileRes.ok || !paymentsRes.ok) {
+          throw new Error('Não foi possível carregar seu painel.')
         }
 
-        // Fetch recent payments
-        const paymentsRes = await fetch('/api/client/payments')
-        if (paymentsRes.ok) {
-          const paymentsData = await paymentsRes.json()
-          setPayments(paymentsData.payments?.slice(0, 5) || [])
-        }
+        const profileData = await profileRes.json()
+        const paymentsData = await paymentsRes.json()
 
-        // Fetch Stripe status if driver
-        if (profileData?.profile?.tipo === 'motorista') {
-          const stripeRes = await fetch('/api/stripe/status')
-          if (stripeRes.ok) {
-            const stripeData = await stripeRes.json()
-            setStripeStatus(stripeData)
-          }
-        }
+        setProfile(profileData.profile)
+        setPayments((paymentsData.payments || []).slice(0, 4))
       } catch (err: any) {
-        console.error('Error fetching data:', err)
-        setError(err.message || 'Failed to load data')
+        console.error('Error loading client dashboard:', err)
+        setError(err.message || 'Erro ao carregar painel')
       } finally {
         setLoading(false)
       }
@@ -101,83 +103,11 @@ export default function UnifiedDashboard() {
     fetchData()
   }, [status])
 
-  // Generate QR Code
-  const generateQRCode = async () => {
-    if (!profile?.celular) return
-
-    try {
-      const QRCode = (await import('qrcode')).default
-      // Remove non-digits and strip country code (55) for cleaner URLs
-      const digitsOnly = profile.celular.replace(/\D/g, '')
-      const phoneForUrl = digitsOnly.startsWith('55') ? digitsOnly.substring(2) : digitsOnly
-      const paymentUrl = `${window.location.origin}/${phoneForUrl}`
-      const qrDataUrl = await QRCode.toDataURL(paymentUrl, {
-        width: 400,
-        margin: 2,
-        color: {
-          dark: '#1F2933',
-          light: '#FFFFFF'
-        }
-      })
-      setQrCodeUrl(qrDataUrl)
-      setShowQRCode(true)
-    } catch (err) {
-      console.error('Error generating QR code:', err)
-    }
-  }
-
-  // Toggle business expense
-  const toggleBusinessExpense = async (paymentId: string, currentValue: boolean) => {
-    try {
-      const res = await fetch(`/api/receipts/${paymentId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_business_expense: !currentValue })
-      })
-
-      if (res.ok) {
-        setPayments(prev => prev.map(p =>
-          p.id === paymentId
-            ? { ...p, is_business_expense: !currentValue }
-            : p
-        ))
-      }
-    } catch (err) {
-      console.error('Error toggling business expense:', err)
-    }
-  }
-
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(amount)
-  }
-
-  // Format date
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: 'short',
-    })
-  }
-
-  // Copy payment link
-  const copyPaymentLink = () => {
-    if (!profile?.celular) return
-    // Remove non-digits and strip country code (55) for cleaner URLs
-    const digitsOnly = profile.celular.replace(/\D/g, '')
-    const phoneForUrl = digitsOnly.startsWith('55') ? digitsOnly.substring(2) : digitsOnly
-    const link = `${window.location.origin}/${phoneForUrl}`
-    navigator.clipboard.writeText(link)
-  }
-
   if (status === 'loading' || loading) {
     return (
       <main style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #F0E7FC 0%, #E8F5E9 100%)',
+        background: '#F5F6FA',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center'
@@ -203,709 +133,186 @@ export default function UnifiedDashboard() {
     return null
   }
 
-  const isDriver = profile?.tipo === 'motorista'
-  const isStripeConnected = isDriver && profile?.stripe_account_id
-
   return (
     <main style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #F0E7FC 0%, #E8F5E9 100%)',
+      background: '#F5F6FA',
       padding: '2rem 1rem'
     }}>
-      <div className="amo-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '2rem',
-          flexWrap: 'wrap',
-          gap: '1rem'
-        }}>
-          <div>
-            <h1 style={{
-              fontSize: '2rem',
-              fontWeight: '800',
-              color: '#1F2933',
-              marginBottom: '0.25rem'
-            }}>
-              👋 Olá, {session.user?.name?.split(' ')[0] || 'Cliente'}!
-            </h1>
-            <p style={{ color: '#52606D', fontSize: '0.95rem' }}>
-              {isDriver ? 'Gerencie pagamentos e receba vendas' : 'Acompanhe seus pagamentos'}
-            </p>
-          </div>
-          <Link href="/settings" className="amo-btn amo-btn-outline">
-            ⚙️ Configurações
-          </Link>
-        </div>
-
-        {/* Main Grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-          gap: '1.5rem'
-        }}>
-          {/* Payment History Card */}
-          <div className="amo-card amo-fade-in">
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '1.5rem'
-            }}>
-              <h2 style={{
-                fontSize: '1.25rem',
-                fontWeight: '700',
-                color: '#1F2933'
-              }}>
-                💳 Últimos Pagamentos
-              </h2>
-              <Link href="/cliente/dashboard/historico" style={{
-                color: '#8B7DD8',
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                textDecoration: 'none'
-              }}>
-                Ver todos →
-              </Link>
-            </div>
-
-            {payments.length === 0 ? (
-              <div style={{
-                padding: '2rem 1rem',
-                textAlign: 'center',
-                color: '#9AA5B1'
-              }}>
-                <p>Nenhum pagamento ainda</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {payments.map((payment) => (
-                  <div key={payment.id} style={{
-                    padding: '1rem',
-                    background: '#F9FAFB',
-                    borderRadius: 'var(--amo-radius-md)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}>
-                    <div>
-                      <p style={{
-                        fontWeight: '600',
-                        color: '#1F2933',
-                        marginBottom: '0.25rem'
-                      }}>
-                        {formatCurrency(payment.valor)}
-                      </p>
-                      <p style={{ fontSize: '0.875rem', color: '#52606D' }}>
-                        {payment.motorista?.nome || 'Vendedor'} • {formatDate(payment.created_at)}
-                      </p>
-                    </div>
-                    <span style={{ fontSize: '1.5rem' }}>
-                      {payment.metodo === 'pix' ? '📱' : '💳'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Receipts Card */}
-          <div className="amo-card amo-fade-in">
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '1.5rem'
-            }}>
-              <h2 style={{
-                fontSize: '1.25rem',
-                fontWeight: '700',
-                color: '#1F2933'
-              }}>
-                📄 Meus Comprovantes
-              </h2>
-            </div>
-
-            {payments.length === 0 ? (
-              <div style={{
-                padding: '2rem 1rem',
-                textAlign: 'center',
-                color: '#9AA5B1'
-              }}>
-                <p>Sem comprovantes</p>
-              </div>
-            ) : (
-              <>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
-                  {payments.slice(0, 3).map((payment) => (
-                    <div key={payment.id} style={{
-                      padding: '1rem',
-                      background: '#F9FAFB',
-                      borderRadius: 'var(--amo-radius-md)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.75rem'
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={payment.is_business_expense || false}
-                        onChange={() => toggleBusinessExpense(payment.id, payment.is_business_expense)}
-                        style={{
-                          width: '18px',
-                          height: '18px',
-                          accentColor: '#8B7DD8',
-                          cursor: 'pointer'
-                        }}
-                      />
-                      <div style={{ flex: 1 }}>
-                        <p style={{
-                          fontSize: '0.875rem',
-                          fontWeight: '600',
-                          color: '#1F2933'
-                        }}>
-                          {payment.receipt_number}
-                        </p>
-                        <p style={{ fontSize: '0.75rem', color: '#52606D' }}>
-                          {payment.is_business_expense ? '💼 Negócio' : '🏠 Pessoal'}
-                        </p>
-                      </div>
-                      <a
-                        href={`/api/receipts/${payment.receipt_number}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          padding: '0.5rem',
-                          color: '#8B7DD8',
-                          fontSize: '1.25rem',
-                          textDecoration: 'none'
-                        }}
-                      >
-                        ⬇️
-                      </a>
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  className="amo-btn amo-btn-outline"
-                  style={{ width: '100%' }}
-                  onClick={() => router.push('/cliente/dashboard/historico')}
-                >
-                  📦 Exportar todos PDFs
-                </button>
-              </>
-            )}
-          </div>
-
-          {/* Saved Cards Card */}
-          <div className="amo-card amo-fade-in">
-            <h2 style={{
-              fontSize: '1.25rem',
-              fontWeight: '700',
-              color: '#1F2933',
-              marginBottom: '1.5rem'
-            }}>
-              💾 Cartões Salvos
-            </h2>
-
-            <div style={{
-              padding: '2rem 1rem',
-              textAlign: 'center',
-              color: '#9AA5B1',
-              marginBottom: '1rem'
-            }}>
-              <p>Nenhum cartão salvo ainda</p>
-            </div>
-
-            <button
-              className="amo-btn amo-btn-outline"
-              style={{ width: '100%' }}
-            >
-              ➕ Adicionar cartão
-            </button>
-          </div>
-        </div>
-
-        {/* Driver-Specific Section */}
-        {isDriver && (
-          <div className="amo-fade-in" style={{ marginTop: '2rem' }}>
-            <div className="amo-card" style={{
-              background: 'linear-gradient(135deg, #E8F5E9 0%, #D4FC79 100%)',
-              border: `2px solid ${isStripeConnected ? '#81C995' : '#FCA5A5'}`
-            }}>
-              <h2 style={{
-                fontSize: '1.5rem',
+      <div style={{ maxWidth: '960px', margin: '0 auto', display: 'grid', gap: '1.5rem' }}>
+        <div className="amo-card amo-fade-in">
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            alignItems: 'center',
+            flexWrap: 'wrap'
+          }}>
+            <div>
+              <p style={{ fontSize: '0.875rem', color: '#52606D', marginBottom: '0.35rem' }}>
+                Área do cliente
+              </p>
+              <h1 style={{
+                fontSize: '2rem',
                 fontWeight: '800',
                 color: '#1F2933',
-                marginBottom: '1.5rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem'
+                marginBottom: '0.35rem'
               }}>
-                🚗 Recursos do Motorista
-              </h2>
-
-              {/* Payment Link Section */}
-              <div style={{
-                background: 'white',
-                borderRadius: 'var(--amo-radius-md)',
-                padding: '1.5rem',
-                marginBottom: '1.5rem'
-              }}>
-                <h3 style={{
-                  fontSize: '1.125rem',
-                  fontWeight: '700',
-                  color: '#1F2933',
-                  marginBottom: '1rem'
-                }}>
-                  🔗 Meu Link de Pagamento
-                </h3>
-
-                {isStripeConnected ? (
-                  <>
-                    <div style={{
-                      background: '#F9FAFB',
-                      padding: '1rem',
-                      borderRadius: 'var(--amo-radius-md)',
-                      marginBottom: '1rem',
-                      fontFamily: 'monospace',
-                      fontSize: '0.875rem',
-                      color: '#1F2933',
-                      wordBreak: 'break-all'
-                    }}>
-                      {window.location.origin}/{profile.celular}
-                    </div>
-
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
-                      gap: '0.75rem'
-                    }}>
-                      <button
-                        onClick={copyPaymentLink}
-                        className="amo-btn amo-btn-secondary"
-                      >
-                        📋 Copiar Link
-                      </button>
-                      <button
-                        onClick={generateQRCode}
-                        className="amo-btn amo-btn-secondary"
-                      >
-                        📱 Ver QR Code
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div style={{
-                      background: '#FEE2E2',
-                      border: '2px solid #FCA5A5',
-                      borderRadius: 'var(--amo-radius-md)',
-                      padding: '1rem',
-                      marginBottom: '1rem',
-                      color: '#991B1B',
-                      fontSize: '0.875rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem'
-                    }}>
-                      <span>🔒</span>
-                      <span>Conecte sua conta Stripe para ativar seu link de pagamento</span>
-                    </div>
-
-                    <Link
-                      href="/settings"
-                      className="amo-btn amo-btn-secondary"
-                      style={{ width: '100%' }}
-                    >
-                      Conectar Stripe Agora →
-                    </Link>
-                  </>
-                )}
-              </div>
-
-              {/* Stripe Alerts */}
-              <div style={{
-                background: stripeStatus?.connected
-                  ? (stripeStatus.charges_enabled && stripeStatus.payouts_enabled
-                    ? 'linear-gradient(135deg, #D1FAE5 0%, #E8F5E9 100%)'
-                    : 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)')
-                  : 'white',
-                borderRadius: 'var(--amo-radius-md)',
-                padding: '1.5rem',
-                marginBottom: '1.5rem',
-                border: stripeStatus?.connected
-                  ? (stripeStatus.charges_enabled && stripeStatus.payouts_enabled
-                    ? '2px solid #10B981'
-                    : '2px solid #F59E0B')
-                  : '2px solid #E4E7EB'
-              }}>
-                <h3 style={{
-                  fontSize: '1.125rem',
-                  fontWeight: '700',
-                  color: '#1F2933',
-                  marginBottom: '1rem'
-                }}>
-                  {stripeStatus?.connected
-                    ? (stripeStatus.charges_enabled && stripeStatus.payouts_enabled
-                      ? '✅ Status da Conta'
-                      : '⚠️ Ação Necessária')
-                    : '⚠️ Alertas da Conta'}
-                </h3>
-
-                {stripeStatus?.connected ? (
-                  <>
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.75rem',
-                      marginBottom: '1rem'
-                    }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.875rem'
-                      }}>
-                        <span>{stripeStatus.charges_enabled ? '✅' : '❌'}</span>
-                        <span style={{ color: '#52606D' }}>
-                          {stripeStatus.charges_enabled ? 'Receber pagamentos' : 'Pagamentos desabilitados'}
-                        </span>
-                      </div>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.875rem'
-                      }}>
-                        <span>{stripeStatus.payouts_enabled ? '✅' : '❌'}</span>
-                        <span style={{ color: '#52606D' }}>
-                          {stripeStatus.payouts_enabled ? 'Saques habilitados' : 'Saques desabilitados'}
-                        </span>
-                      </div>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.875rem'
-                      }}>
-                        <span>{stripeStatus.details_submitted ? '✅' : '⏳'}</span>
-                        <span style={{ color: '#52606D' }}>
-                          {stripeStatus.details_submitted ? 'Cadastro completo' : 'Dados pendentes'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {stripeStatus.requirements && (
-                      stripeStatus.requirements.currently_due.length > 0 ||
-                      stripeStatus.requirements.past_due.length > 0
-                    ) && (
-                      <div style={{
-                        background: 'rgba(239, 68, 68, 0.1)',
-                        borderRadius: 'var(--amo-radius-md)',
-                        padding: '0.75rem',
-                        marginBottom: '1rem'
-                      }}>
-                        <p style={{
-                          fontSize: '0.875rem',
-                          fontWeight: '600',
-                          color: '#DC2626',
-                          marginBottom: '0.5rem'
-                        }}>
-                          Pendências detectadas:
-                        </p>
-                        <ul style={{
-                          fontSize: '0.75rem',
-                          color: '#991B1B',
-                          paddingLeft: '1.25rem',
-                          margin: 0
-                        }}>
-                          {[...stripeStatus.requirements.past_due, ...stripeStatus.requirements.currently_due].slice(0, 2).map((req, idx) => (
-                            <li key={idx}>{req.replace(/_/g, ' ')}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    <Link
-                      href="/settings"
-                      style={{
-                        color: '#8B7DD8',
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        textDecoration: 'none'
-                      }}
-                    >
-                      Gerenciar Conta Stripe →
-                    </Link>
-                  </>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      fontSize: '0.875rem'
-                    }}>
-                      <span>⚠️</span>
-                      <span style={{ color: '#52606D' }}>Stripe não conectado</span>
-                    </div>
-
-                    <Link
-                      href="/settings"
-                      style={{
-                        color: '#8B7DD8',
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        textDecoration: 'none'
-                      }}
-                    >
-                      Conectar Stripe →
-                    </Link>
-                  </div>
-                )}
-              </div>
-
-              {/* Pix Status Card */}
-              <div style={{
-                background: profile.pix_key
-                  ? 'linear-gradient(135deg, #D1FAE5 0%, #E8F5E9 100%)'
-                  : 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
-                borderRadius: 'var(--amo-radius-md)',
-                padding: '1.5rem',
-                marginBottom: '1.5rem',
-                border: profile.pix_key
-                  ? '2px solid #10B981'
-                  : '2px solid #F59E0B'
-              }}>
-                <h3 style={{
-                  fontSize: '1.125rem',
-                  fontWeight: '700',
-                  color: '#1F2933',
-                  marginBottom: '1rem'
-                }}>
-                  {profile.pix_key ? '✅ Pix Configurado' : '⚠️ Configure seu Pix'}
-                </h3>
-
-                {profile.pix_key ? (
-                  <>
-                    <div style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.75rem',
-                      marginBottom: '1rem'
-                    }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.875rem'
-                      }}>
-                        <span>✅</span>
-                        <span style={{ color: '#52606D' }}>
-                          Recebimento via Pix ativo
-                        </span>
-                      </div>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.875rem'
-                      }}>
-                        <span>📱</span>
-                        <span style={{ color: '#52606D', fontFamily: 'monospace' }}>
-                          {profile.pix_key}
-                        </span>
-                      </div>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        fontSize: '0.875rem'
-                      }}>
-                        <span>💰</span>
-                        <span style={{ color: '#52606D' }}>
-                          Sem taxas! Receba 100% do valor
-                        </span>
-                      </div>
-                    </div>
-
-                    <Link
-                      href="/settings"
-                      style={{
-                        color: '#8B7DD8',
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        textDecoration: 'none'
-                      }}
-                    >
-                      Alterar Chave Pix →
-                    </Link>
-                  </>
-                ) : (
-                  <>
-                    <p style={{
-                      fontSize: '0.875rem',
-                      color: '#92400E',
-                      marginBottom: '1rem'
-                    }}>
-                      Configure sua chave Pix para receber pagamentos instantâneos sem taxas!
-                    </p>
-
-                    <div style={{
-                      background: 'rgba(252, 211, 77, 0.2)',
-                      borderRadius: 'var(--amo-radius-md)',
-                      padding: '0.75rem',
-                      marginBottom: '1rem'
-                    }}>
-                      <p style={{
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        color: '#92400E',
-                        marginBottom: '0.5rem'
-                      }}>
-                        💡 Vantagens do Pix:
-                      </p>
-                      <ul style={{
-                        fontSize: '0.75rem',
-                        color: '#92400E',
-                        paddingLeft: '1.25rem',
-                        margin: 0
-                      }}>
-                        <li>Receba 100% do valor (sem taxas!)</li>
-                        <li>Dinheiro cai na hora</li>
-                        <li>Disponível 24/7</li>
-                      </ul>
-                    </div>
-
-                    <Link
-                      href="/settings"
-                      className="amo-btn amo-btn-secondary"
-                      style={{ display: 'inline-block' }}
-                    >
-                      Configurar Pix Agora →
-                    </Link>
-                  </>
-                )}
-              </div>
-
-              {/* Lucro Analytics Link */}
-              <Link
-                href="/motorista/lucro"
-                style={{
-                  display: 'block',
-                  background: 'white',
-                  borderRadius: 'var(--amo-radius-md)',
-                  padding: '1.5rem',
-                  textDecoration: 'none',
-                  border: '2px solid #81C995',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)'
-                  e.currentTarget.style.boxShadow = '0 8px 16px rgba(129, 201, 149, 0.2)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
-              >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <span style={{ fontSize: '2rem' }}>💰</span>
-                    <div>
-                      <h3 style={{
-                        fontSize: '1.125rem',
-                        fontWeight: '700',
-                        color: '#1F2933',
-                        marginBottom: '0.25rem'
-                      }}>
-                        Ver Meu Lucro
-                      </h3>
-                      <p style={{ fontSize: '0.875rem', color: '#52606D' }}>
-                        Estatísticas, gráficos e análises
-                      </p>
-                    </div>
-                  </div>
-                  <span style={{ fontSize: '1.5rem', color: '#81C995' }}>→</span>
-                </div>
-              </Link>
+                Olá, {(profile?.nome || session.user?.name || 'Cliente').split(' ')[0]}
+              </h1>
+              <p style={{ color: '#52606D', fontSize: '0.95rem' }}>
+                Seus comprovantes, cartões e configurações em um só lugar.
+              </p>
             </div>
+            <Link href="/settings" className="amo-btn amo-btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+              Configurações
+            </Link>
+          </div>
+        </div>
+
+        {profile?.can_use_driver_view && (
+          <div className="amo-card amo-fade-in" style={{
+            background: 'linear-gradient(135deg, #EFF6FF 0%, #F5F3FF 100%)',
+            border: '2px solid #C4B5FD'
+          }}>
+            <p style={{ fontSize: '0.875rem', color: '#4338CA', marginBottom: '0.35rem' }}>
+              Conta com área de motorista ativa
+            </p>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1F2933', marginBottom: '0.5rem' }}>
+              Alterne para receber pagamentos e ver analytics
+            </h2>
+            <p style={{ fontSize: '0.9rem', color: '#4C1D95', marginBottom: '1rem' }}>
+              Sua área do cliente continua separada. Quando quiser receber, use a visão de motorista.
+            </p>
+            <Link href="/motorista/dashboard/overview" className="amo-btn amo-btn-secondary">
+              Abrir área do motorista
+            </Link>
           </div>
         )}
 
-        {/* QR Code Modal */}
-        {showQRCode && (
-          <div
-            onClick={() => setShowQRCode(false)}
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(0,0,0,0.8)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000,
-              padding: '2rem'
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '1rem'
+        }}>
+          {quickActions.map((action) => (
+            <Link
+              key={action.href}
+              href={action.href}
+              className="amo-card amo-fade-in"
               style={{
-                background: 'white',
-                borderRadius: 'var(--amo-radius-lg)',
-                padding: '2rem',
-                maxWidth: '500px',
-                width: '100%',
-                textAlign: 'center'
+                textDecoration: 'none',
+                color: 'inherit',
+                transition: 'transform 0.18s ease, box-shadow 0.18s ease',
+                cursor: 'pointer'
               }}
             >
-              <h3 style={{
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                marginBottom: '1rem',
-                color: '#1F2933'
-              }}>
-                📱 Mostre este QR Code
-              </h3>
-              <p style={{
-                color: '#52606D',
-                marginBottom: '1.5rem',
-                fontSize: '0.875rem'
-              }}>
-                O cliente pode escanear para fazer o pagamento
+              <div style={{ width: '40px', height: '40px', background: '#F5F3FF', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem' }}>
+                {action.icon}
+              </div>
+              <p style={{ fontSize: '0.9375rem', fontWeight: '700', color: '#1F2933', marginBottom: '0.25rem' }}>
+                {action.title}
               </p>
-              {qrCodeUrl && (
-                <img
-                  src={qrCodeUrl}
-                  alt="QR Code de Pagamento"
-                  style={{
-                    width: '100%',
-                    maxWidth: '400px',
-                    height: 'auto',
-                    marginBottom: '1.5rem'
-                  }}
-                />
-              )}
-              <button
-                onClick={() => setShowQRCode(false)}
-                className="amo-btn amo-btn-secondary"
-                style={{ width: '100%' }}
-              >
-                Fechar
-              </button>
+              <p style={{ fontSize: '0.8125rem', color: '#52606D', lineHeight: '1.5' }}>
+                {action.description}
+              </p>
+            </Link>
+          ))}
+        </div>
+
+        <div className="amo-card amo-fade-in">
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '1rem',
+            marginBottom: '1rem',
+            flexWrap: 'wrap'
+          }}>
+            <div>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#1F2933', marginBottom: '0.25rem' }}>
+                Pagamentos recentes
+              </h2>
+              <p style={{ fontSize: '0.875rem', color: '#52606D' }}>
+                Os últimos comprovantes pagos com sua conta.
+              </p>
             </div>
+            <Link href="/cliente/dashboard/historico" className="amo-btn amo-btn-outline">
+              Ver histórico completo
+            </Link>
           </div>
-        )}
+
+          {error && (
+            <div style={{
+              background: '#FEE2E2',
+              border: '2px solid #FCA5A5',
+              borderRadius: 'var(--amo-radius-md)',
+              padding: '1rem',
+              color: '#991B1B',
+              fontSize: '0.875rem'
+            }}>
+              {error}
+            </div>
+          )}
+
+          {!error && payments.length === 0 && (
+            <div style={{
+              background: '#F9FAFB',
+              borderRadius: 'var(--amo-radius-md)',
+              padding: '1.5rem',
+              color: '#52606D',
+              fontSize: '0.95rem',
+              textAlign: 'center'
+            }}>
+              Ainda não há pagamentos vinculados a esta conta.
+            </div>
+          )}
+
+          {!error && payments.length > 0 && (
+            <div style={{ display: 'grid', gap: '0.75rem' }}>
+              {payments.map((payment) => (
+                <div
+                  key={payment.id}
+                  style={{
+                    border: '1px solid #E5E7EB',
+                    borderRadius: 'var(--amo-radius-md)',
+                    padding: '1rem',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    flexWrap: 'wrap'
+                  }}
+                >
+                  <div>
+                    <p style={{ fontWeight: '700', color: '#1F2933', marginBottom: '0.2rem' }}>
+                      {payment.motorista?.nome || 'Motorista'}
+                    </p>
+                    <p style={{ fontSize: '0.85rem', color: '#52606D' }}>
+                      {new Date(payment.created_at).toLocaleDateString('pt-BR', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                      {payment.metodo ? ` · ${payment.metodo}` : ''}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ fontWeight: '700', color: '#1F2933', marginBottom: '0.2rem' }}>
+                      {formatCentsToBrl(payment.valor)}
+                    </p>
+                    <p style={{ fontSize: '0.8rem', color: '#6B7280' }}>
+                      {payment.status === 'succeeded' ? 'Pago' : payment.status}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </main>
   )

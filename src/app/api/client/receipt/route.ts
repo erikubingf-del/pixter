@@ -4,6 +4,8 @@ import { supabaseServer } from '@/lib/supabase/client';
 import { escapeHtml } from '@/lib/utils/html-escape';
 import { safeErrorResponse } from '@/lib/utils/api-error';
 
+export const dynamic = 'force-dynamic';
+
 const formatCurrency = (value: number | null | undefined) => {
   if (value === null || value === undefined) return 'R$ 0,00';
   return (value / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -72,7 +74,7 @@ export async function GET(request: Request) {
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Comprovante de Pagamento - Pixter</title>
+        <title>Comprovante de Pagamento - AmoPagar</title>
         <style>
           body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; padding: 20px; background-color: #f7fafc; color: #2d3748; line-height: 1.6; }
           .receipt { max-width: 600px; margin: 20px auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 30px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
@@ -91,7 +93,7 @@ export async function GET(request: Request) {
       <body>
         <div class="receipt">
           <div class="header">
-            <div class="logo">PIXTER</div>
+            <div class="logo">AmoPagar</div>
             <p>Comprovante de Pagamento</p>
           </div>
           <div class="info">
@@ -103,7 +105,7 @@ export async function GET(request: Request) {
             <div class="info-row"><span class="info-label">Status:</span><span class="info-value">${escapeHtml(formatStatus(payment.status))}</span></div>
           </div>
           <div class="footer">
-            <p>Este é um comprovante eletrônico gerado pelo sistema Pixter.</p>
+            <p>Este é um comprovante eletrônico gerado pelo sistema AmoPagar.</p>
             <p>ID do Pagador: ${userIdEsc}</p>
           </div>
         </div>

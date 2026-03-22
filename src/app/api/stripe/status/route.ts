@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/get-session';
 import { supabaseServer } from '@/lib/supabase/client';
-import stripe from '@/lib/stripe/server';
+import {
+  getDisconnectedStripeSummary,
+  resetStripeConnectState,
+  summarizeStoredStripeAccount,
+  syncStripeAccountState,
+} from '@/lib/stripe/connect';
 import { safeErrorResponse } from '@/lib/utils/api-error';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +17,9 @@ export async function GET() {
 
     const { data: profile, error: profileError } = await supabaseServer
       .from('profiles')
-      .select('id, tipo, stripe_account_id')
+      .select(
+        'id, tipo, stripe_account_id, stripe_account_status, stripe_account_charges_enabled, stripe_account_payouts_enabled, stripe_account_details_submitted'
+      )
       .eq('id', session.id)
       .single();
 
@@ -21,38 +28,20 @@ export async function GET() {
     }
 
     if (profile.tipo !== 'motorista' || !profile.stripe_account_id) {
-      return NextResponse.json({
-        connected: false,
-        charges_enabled: false,
-        payouts_enabled: false,
-        details_submitted: false
-      });
+      return NextResponse.json(getDisconnectedStripeSummary());
     }
 
     try {
-      const account = await stripe.accounts.retrieve(profile.stripe_account_id);
-
-      return NextResponse.json({
-        connected: true,
-        charges_enabled: account.charges_enabled || false,
-        payouts_enabled: account.payouts_enabled || false,
-        details_submitted: account.details_submitted || false,
-        requirements: {
-          currently_due: account.requirements?.currently_due || [],
-          eventually_due: account.requirements?.eventually_due || [],
-          past_due: account.requirements?.past_due || []
-        }
-      });
+      const { summary } = await syncStripeAccountState(profile.id, profile.stripe_account_id);
+      return NextResponse.json(summary);
     } catch (stripeError: any) {
       if (stripeError.code === 'account_invalid') {
-        return NextResponse.json({
-          connected: false,
-          charges_enabled: false,
-          payouts_enabled: false,
-          details_submitted: false
-        });
+        await resetStripeConnectState(profile.id);
+        return NextResponse.json(getDisconnectedStripeSummary());
       }
-      return safeErrorResponse(stripeError, 'Failed to fetch Stripe status');
+
+      console.error('Failed to fetch live Stripe status:', stripeError);
+      return NextResponse.json(summarizeStoredStripeAccount(profile));
     }
   } catch (error: any) {
     if (error.name === 'AuthError') {

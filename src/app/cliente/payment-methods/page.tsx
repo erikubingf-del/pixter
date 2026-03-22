@@ -9,18 +9,16 @@ import { useSession } from "next-auth/react";
 // Define a type for the payment method (adjust based on your API response)
 type PaymentMethod = {
   id: string;
-  card: {
-    brand: string;
-    last4: string;
-    exp_month: number;
-    exp_year: number;
-  };
-  // Add other relevant fields like billing details if needed
+  card_brand: string;
+  last4: string;
+  exp_month: number;
+  exp_year: number;
+  is_default?: boolean;
 };
 
 export default function WalletPage() {
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,10 +39,10 @@ export default function WalletPage() {
           const response = await fetch("/api/client/payment-methods"); 
           if (!response.ok) {
             const data = await response.json();
-            throw new Error(data.message || "Erro ao buscar métodos de pagamento.");
+            throw new Error(data.error || data.message || "Erro ao buscar métodos de pagamento.");
           }
-          const data: PaymentMethod[] = await response.json();
-          setPaymentMethods(data);
+          const data = await response.json();
+          setPaymentMethods(data.paymentMethods || []);
         } catch (err: any) {
           setError(err.message);
           console.error("Failed to fetch payment methods:", err);
@@ -62,12 +60,12 @@ export default function WalletPage() {
     setLoading(true); // Indicate loading state for deletion
     setError(null);
     try {
-      const response = await fetch(`/api/client/payment-methods?id=${paymentMethodId}`, {
+      const response = await fetch(`/api/client/payment-methods/${paymentMethodId}`, {
         method: "DELETE",
       });
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.message || "Erro ao remover cartão.");
+        throw new Error(data.error || data.message || "Erro ao remover cartão.");
       }
       // Remove the card from the local state
       setPaymentMethods(prev => prev.filter(pm => pm.id !== paymentMethodId));
@@ -110,12 +108,17 @@ export default function WalletPage() {
         <div className="space-y-4">
           {paymentMethods.map((pm) => (
             <div key={pm.id} className="bg-white p-4 rounded-lg shadow flex justify-between items-center">
-              <div>
-                <span className="font-medium capitalize">{pm.card.brand}</span>
-                <span className="text-gray-600"> terminando em {pm.card.last4}</span>
+                <div>
+                <span className="font-medium capitalize">{pm.card_brand}</span>
+                <span className="text-gray-600"> terminando em {pm.last4}</span>
                 <span className="block text-sm text-gray-500">
-                  Expira em {String(pm.card.exp_month).padStart(2, "0")}/{pm.card.exp_year}
+                  Expira em {String(pm.exp_month).padStart(2, "0")}/{pm.exp_year}
                 </span>
+                {pm.is_default && (
+                  <span className="mt-1 inline-flex rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                    Padrão
+                  </span>
+                )}
               </div>
               <button
                 onClick={() => handleDelete(pm.id)}

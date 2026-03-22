@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import '../../../styles/amopagar-theme.css'
+import { formatCentsToBrl } from '@/lib/utils/payment'
 
 interface Payment {
   id: string
@@ -65,54 +66,9 @@ export default function LucroPage() {
   // Redirect if not authenticated
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/motorista/login')
+      router.push('/login')
     }
   }, [status, router])
-
-  // Fetch payments data
-  useEffect(() => {
-    const fetchData = async () => {
-      if (status !== 'authenticated') return
-
-      try {
-        setLoading(true)
-        setError('')
-
-        const res = await fetch(`/api/motorista/lucro?days=${dateRange}`)
-
-        if (!res.ok) {
-          throw new Error('Failed to fetch payments')
-        }
-
-        const data = await res.json()
-        const allPayments = data.payments || []
-
-        // Separate pending and succeeded payments
-        const succeeded = allPayments.filter((p: Payment) => p.status === 'succeeded')
-        const pending = allPayments.filter((p: Payment) => p.status === 'pending')
-
-        setPayments(succeeded)
-        setPendingPayments(pending)
-
-        // Calculate analytics (only from succeeded payments)
-        calculateAnalytics(succeeded)
-
-        // Fetch Stripe status
-        const stripeRes = await fetch('/api/stripe/status')
-        if (stripeRes.ok) {
-          const stripeData = await stripeRes.json()
-          setStripeStatus(stripeData)
-        }
-      } catch (err: any) {
-        console.error('Error fetching payments:', err)
-        setError(err.message || 'Failed to load data')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [status, dateRange])
 
   const handleAddPixPayment = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -234,7 +190,7 @@ export default function LucroPage() {
     }
   }
 
-  const calculateAnalytics = (paymentsData: Payment[]) => {
+  const calculateAnalytics = useCallback((paymentsData: Payment[]) => {
     if (paymentsData.length === 0) {
       setAnalytics({
         total: 0,
@@ -334,13 +290,52 @@ export default function LucroPage() {
       byDay: byDayArray.slice(0, 30), // Last 30 days for chart
       byMethod: byMethodArray
     })
-  }
+  }, [dateRange])
+
+  // Fetch payments data
+  useEffect(() => {
+    const fetchData = async () => {
+      if (status !== 'authenticated') return
+
+      try {
+        setLoading(true)
+        setError('')
+
+        const res = await fetch(`/api/motorista/lucro?days=${dateRange}`)
+
+        if (!res.ok) {
+          throw new Error('Failed to fetch payments')
+        }
+
+        const data = await res.json()
+        const allPayments = data.payments || []
+
+        // Separate pending and succeeded payments
+        const succeeded = allPayments.filter((p: Payment) => p.status === 'succeeded')
+        const pending = allPayments.filter((p: Payment) => p.status === 'pending')
+
+        setPayments(succeeded)
+        setPendingPayments(pending)
+        calculateAnalytics(succeeded)
+
+        const stripeRes = await fetch('/api/stripe/status')
+        if (stripeRes.ok) {
+          const stripeData = await stripeRes.json()
+          setStripeStatus(stripeData)
+        }
+      } catch (err: any) {
+        console.error('Error fetching payments:', err)
+        setError(err.message || 'Failed to load data')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [calculateAnalytics, dateRange, status])
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(amount)
+    return formatCentsToBrl(amount)
   }
 
   if (status === 'loading' || loading) {
@@ -690,7 +685,7 @@ export default function LucroPage() {
                       color: '#1F2933',
                       marginBottom: '0.25rem'
                     }}>
-                      R$ {payment.valor.toFixed(2)}
+                      {formatCurrency(payment.valor)}
                     </p>
                     <p style={{
                       fontSize: '0.75rem',
@@ -844,7 +839,7 @@ export default function LucroPage() {
                   color: '#81C995',
                   marginTop: '0.5rem'
                 }}>
-                  📈 {((analytics.last30Days / analytics.total) * 100).toFixed(0)}% do total
+                  📈 {analytics.total > 0 ? ((analytics.last30Days / analytics.total) * 100).toFixed(0) : '0'}% do total
                 </p>
               </div>
 

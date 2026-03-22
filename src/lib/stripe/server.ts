@@ -10,11 +10,12 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 
 export default stripe;
 
-// Platform fee configuration
+// Pilot pricing: AmoPagar charges 3% + R$0,39 per card payment.
 export const PLATFORM_FEE_RATE = 0.03; // 3%
+export const PLATFORM_FIXED_FEE_CENTS = 39; // R$0,39
 
 export function calculateFee(amountCents: number): number {
-  return Math.floor(amountCents * PLATFORM_FEE_RATE);
+  return Math.round(amountCents * PLATFORM_FEE_RATE + PLATFORM_FIXED_FEE_CENTS);
 }
 
 // Amount validation

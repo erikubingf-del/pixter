@@ -8,6 +8,8 @@
 
 # testing
 /coverage
+/playwright-report
+/test-results
 
 # next.js
 /.next/
@@ -31,13 +33,19 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
+.env.vercel.*
 
 # vercel
 .vercel
+supabase/.temp/
+supabase/.branches/
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# MCP config (contains tokens)
+.mcp.json
 
 # IDE
 .vscode/
@@ -48,3 +56,5 @@ next-env.d.ts
 
 # OS
 Thumbs.db
+.env.production
+nginx/certs/

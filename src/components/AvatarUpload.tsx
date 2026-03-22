@@ -109,8 +109,9 @@ export default function AvatarUpload({ currentAvatarUrl, onUpdate, userId }: Ava
             key={avatarUrl} // Add key to force re-render on URL change
             src={avatarUrl}
             alt="Avatar"
-            layout="fill"
-            objectFit="cover"
+            fill
+            sizes="128px"
+            style={{ objectFit: 'cover' }}
             priority // Prioritize loading the avatar image
             onError={() => {
                 console.error(`Failed to load image: ${avatarUrl}`);

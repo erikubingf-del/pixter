@@ -1,14 +1,31 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './options';
+import { supabaseServer } from '@/lib/supabase/client';
+import { hasDriverCapabilityFromProfile } from '@/lib/auth/driver-profile';
 
 export interface AuthSession {
   id: string;
   email: string;
   tipo: string;
+  canUseDriverView?: boolean;
   phone?: string;
   stripeAccountId?: string;
   name?: string;
   image?: string;
+}
+
+export async function hasDriverCapability(userId: string): Promise<boolean> {
+  const { data: profile, error } = await supabaseServer
+    .from('profiles')
+    .select('tipo, onboarding_completed, stripe_account_id, cpf, profissao, data_nascimento')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error || !profile) {
+    return false;
+  }
+
+  return hasDriverCapabilityFromProfile(profile);
 }
 
 /**
@@ -47,18 +64,24 @@ export async function requireAuth(): Promise<AuthSession> {
 
 export async function requireMotorista(): Promise<AuthSession> {
   const session = await requireAuth();
-  if (session.tipo !== 'motorista') {
+  if (session.tipo === 'motorista') {
+    return { ...session, canUseDriverView: true };
+  }
+
+  const canUseDriverView = await hasDriverCapability(session.id);
+  if (!canUseDriverView) {
     throw new AuthError('Acesso negado', 403);
   }
-  return session;
+
+  return {
+    ...session,
+    tipo: 'motorista',
+    canUseDriverView,
+  };
 }
 
 export async function requireCliente(): Promise<AuthSession> {
-  const session = await requireAuth();
-  if (session.tipo !== 'cliente') {
-    throw new AuthError('Acesso negado', 403);
-  }
-  return session;
+  return requireAuth();
 }
 
 export class AuthError extends Error {

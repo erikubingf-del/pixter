@@ -14,7 +14,7 @@ export async function POST() {
   try {
     return NextResponse.json(
       {
-        error: 'Use o login via NextAuth. Chame signIn("credentials", { email, password }) no frontend.',
+        error: 'Use o login compartilhado via NextAuth. Chame signIn("email-password", { email, password }) no frontend.',
         redirect: '/api/auth/signin',
       },
       { status: 410 } // Gone

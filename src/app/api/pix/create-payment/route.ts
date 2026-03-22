@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/client'
+import { brlToCents } from '@/lib/utils/payment'
 
 /**
  * Generate a unique receipt number for Pix payments
@@ -25,8 +26,8 @@ export async function POST(request: Request) {
     }
 
     // Validate amount
-    const amountInBRL = parseFloat(valor)
-    if (isNaN(amountInBRL) || amountInBRL <= 0) {
+    const amountInCents = brlToCents(valor)
+    if (!Number.isFinite(amountInCents) || amountInCents <= 0) {
       return NextResponse.json(
         { error: 'Invalid amount' },
         { status: 400 }
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
     const receiptNumber = generatePixReceiptNumber()
 
     // For Pix, there's no commission - driver gets 100%
-    const netAmount = amountInBRL
+    const netAmount = amountInCents
     const applicationFee = 0
 
     // Create payment record
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
       .insert({
         motorista_id,
         cliente_id: null, // Guest payment for now
-        valor: amountInBRL,
+        valor: amountInCents,
         moeda: 'brl',
         status: 'pending', // Will be updated to 'succeeded' after manual confirmation
         metodo: 'pix',

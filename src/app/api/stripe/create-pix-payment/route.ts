@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
     const { data: profile, error: profileError } = await supabaseServer
       .from("profiles")
-      .select("id, stripe_account_id, stripe_account_charges_enabled")
+      .select("id, stripe_account_id, stripe_account_charges_enabled, stripe_account_payouts_enabled")
       .eq("celular", formattedPhone)
       .eq("tipo", "motorista")
       .maybeSingle();
@@ -37,8 +37,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Motorista não encontrado ou não habilitado para pagamentos." }, { status: 404 });
     }
 
-    if (profile.stripe_account_charges_enabled === false) {
-      return NextResponse.json({ error: "Conta do motorista ainda não está ativa para receber pagamentos." }, { status: 400 });
+    const stripeReady = Boolean(
+      profile.stripe_account_charges_enabled &&
+        profile.stripe_account_payouts_enabled
+    );
+
+    if (!stripeReady) {
+      return NextResponse.json(
+        { error: "Conta do motorista ainda não está totalmente verificada para receber pagamentos." },
+        { status: 400 }
+      );
     }
 
     const applicationFee = calculateFee(amountInCents);

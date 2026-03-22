@@ -3,6 +3,10 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { supabaseServer } from '@/lib/supabase/client'
 import { safeErrorResponse } from '@/lib/utils/api-error'
+import {
+  hasDriverCapabilityFromProfile,
+  isDriverOnboardingComplete,
+} from '@/lib/auth/driver-profile'
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +15,7 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session?.user?.email) {
+    if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -21,8 +25,8 @@ export async function GET() {
     // Fetch profile from database
     const { data: profile, error } = await supabaseServer
       .from('profiles')
-      .select('id, nome, email, celular, cpf, tipo, stripe_account_id, pix_key, avatar_url, company_name, city, address')
-      .eq('email', session.user.email)
+      .select('id, nome, email, celular, cpf, tipo, stripe_account_id, stripe_account_status, stripe_account_charges_enabled, stripe_account_payouts_enabled, onboarding_completed, profissao, data_nascimento, pix_key, avatar_url, company_name, city, address')
+      .eq('id', session.user.id)
       .single()
 
     if (error) {
@@ -33,7 +37,22 @@ export async function GET() {
       )
     }
 
-    return NextResponse.json({ profile })
+    const canUseDriverView = hasDriverCapabilityFromProfile(profile)
+
+    const stripeReady = Boolean(
+      profile.stripe_account_id &&
+        profile.stripe_account_charges_enabled &&
+        profile.stripe_account_payouts_enabled
+    )
+
+    return NextResponse.json({
+      profile: {
+        ...profile,
+        can_use_driver_view: canUseDriverView,
+        driver_onboarding_complete: isDriverOnboardingComplete(profile),
+        stripe_ready: stripeReady,
+      },
+    })
   } catch (error: unknown) {
     return safeErrorResponse(error, 'Erro ao buscar perfil')
   }
@@ -43,7 +62,7 @@ export async function PATCH(request: Request) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session?.user?.email) {
+    if (!session?.user?.id) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -65,7 +84,7 @@ export async function PATCH(request: Request) {
         pix_key,
         updated_at: new Date().toISOString()
       })
-      .eq('email', session.user.email)
+      .eq('id', session.user.id)
       .select()
       .single()
 

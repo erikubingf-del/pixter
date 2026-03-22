@@ -2,47 +2,48 @@
 
 :root {
   /* Brand Colors */
-  --amo-purple: #8B7DD8;
-  --amo-purple-light: #A094E0;
-  --amo-purple-dark: #6B5DB8;
-  --amo-green: #81C995;
-  --amo-green-light: #9DD9AC;
-  --amo-green-dark: #61A975;
+  --amo-purple: #6C5DD3;
+  --amo-purple-light: #8B7DD8;
+  --amo-purple-dark: #5549B8;
+  --amo-green: #00C9A7;
+  --amo-green-light: #2DDCBC;
+  --amo-green-dark: #00A88A;
 
   /* Neutrals */
   --amo-white: #FFFFFF;
-  --amo-off-white: #F9FAFB;
-  --amo-gray-50: #F5F7FA;
-  --amo-gray-100: #E4E7EB;
-  --amo-gray-200: #CBD2D9;
-  --amo-gray-300: #9AA5B1;
-  --amo-gray-400: #7B8794;
-  --amo-gray-500: #616E7C;
-  --amo-gray-600: #52606D;
-  --amo-gray-700: #3E4C59;
-  --amo-gray-800: #323F4B;
-  --amo-gray-900: #1F2933;
+  --amo-off-white: #F5F6FA;
+  --amo-gray-50: #F8F9FC;
+  --amo-gray-100: #EDEEF2;
+  --amo-gray-200: #D8DAE5;
+  --amo-gray-300: #9CA3AF;
+  --amo-gray-400: #6B7280;
+  --amo-gray-500: #52606D;
+  --amo-gray-600: #374151;
+  --amo-gray-700: #1F2937;
+  --amo-gray-800: #111827;
+  --amo-gray-900: #0D1117;
 
   /* Gradients */
-  --amo-gradient-purple: linear-gradient(135deg, #E0C3FC 0%, #8B7DD8 100%);
-  --amo-gradient-green: linear-gradient(135deg, #D4FC79 0%, #81C995 100%);
-  --amo-gradient-bg: linear-gradient(135deg, #E0C3FC 0%, #8EC5FC 50%, #D4FC79 100%);
+  --amo-gradient-purple: linear-gradient(135deg, #8B7DD8 0%, #6C5DD3 100%);
+  --amo-gradient-green: linear-gradient(135deg, #2DDCBC 0%, #00C9A7 100%);
+  --amo-gradient-bg: linear-gradient(160deg, #F5F6FA 0%, #EEF0F8 100%);
 
-  /* Shadows */
-  --amo-shadow-sm: 0 1px 3px rgba(139, 125, 216, 0.08);
-  --amo-shadow-md: 0 4px 6px rgba(139, 125, 216, 0.12);
-  --amo-shadow-lg: 0 10px 25px rgba(139, 125, 216, 0.15);
-  --amo-shadow-xl: 0 20px 40px rgba(139, 125, 216, 0.2);
+  /* Shadows — refined, not purple-tinted */
+  --amo-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --amo-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --amo-shadow-md: 0 4px 8px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --amo-shadow-lg: 0 10px 24px rgba(0, 0, 0, 0.08), 0 4px 8px rgba(0, 0, 0, 0.04);
+  --amo-shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.10), 0 8px 16px rgba(0, 0, 0, 0.04);
 
   /* Border Radius */
   --amo-radius-sm: 8px;
-  --amo-radius-md: 16px;
-  --amo-radius-lg: 24px;
-  --amo-radius-xl: 32px;
+  --amo-radius-md: 12px;
+  --amo-radius-lg: 16px;
+  --amo-radius-xl: 24px;
   --amo-radius-full: 9999px;
 
-  /* Typography */
-  --amo-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* Typography — IBM Plex Sans loaded via next/font */
+  --amo-font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --amo-font-size-xs: 0.75rem;
   --amo-font-size-sm: 0.875rem;
   --amo-font-size-base: 1rem;
@@ -68,103 +69,160 @@
 /* Base Styles */
 body {
   font-family: var(--amo-font-family);
-  color: var(--amo-gray-900);
+  color: var(--amo-gray-700);
   background: var(--amo-off-white);
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Buttons */
+/* ─── Buttons ─────────────────────────────────────────────── */
+
 .amo-btn {
-  padding: 0.75rem 2rem;
+  padding: 0.75rem 1.75rem;
   border-radius: var(--amo-radius-full);
   font-weight: 600;
-  font-size: var(--amo-font-size-base);
+  font-size: var(--amo-font-size-sm);
   border: none;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.18s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  box-shadow: var(--amo-shadow-sm);
+  text-decoration: none;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
+.amo-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Primary — Purple */
 .amo-btn-primary {
   background: var(--amo-purple);
   color: white;
+  box-shadow: 0 2px 8px rgba(108, 93, 211, 0.30);
 }
 
-.amo-btn-primary:hover {
+.amo-btn-primary:hover:not(:disabled) {
   background: var(--amo-purple-dark);
-  box-shadow: var(--amo-shadow-md);
-  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(108, 93, 211, 0.40);
+  transform: translateY(-1px);
 }
 
+/* Secondary — Same purple (used as main CTA in most forms) */
 .amo-btn-secondary {
+  background: var(--amo-purple);
+  color: white;
+  box-shadow: 0 2px 8px rgba(108, 93, 211, 0.30);
+}
+
+.amo-btn-secondary:hover:not(:disabled) {
+  background: var(--amo-purple-dark);
+  box-shadow: 0 4px 16px rgba(108, 93, 211, 0.40);
+  transform: translateY(-1px);
+}
+
+/* Google — White, bordered */
+.amo-btn-google {
+  background: white;
+  color: var(--amo-gray-700);
+  border: 1.5px solid var(--amo-gray-200);
+  box-shadow: var(--amo-shadow-sm);
+}
+
+.amo-btn-google:hover:not(:disabled) {
+  background: var(--amo-gray-50);
+  border-color: var(--amo-gray-300);
+  box-shadow: var(--amo-shadow-md);
+}
+
+/* Teal — Success/secondary action */
+.amo-btn-teal {
   background: var(--amo-green);
   color: white;
+  box-shadow: 0 2px 8px rgba(0, 201, 167, 0.28);
 }
 
-.amo-btn-secondary:hover {
+.amo-btn-teal:hover:not(:disabled) {
   background: var(--amo-green-dark);
-  box-shadow: var(--amo-shadow-md);
-  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 201, 167, 0.35);
+  transform: translateY(-1px);
 }
 
+/* Outline — Border only */
 .amo-btn-outline {
   background: transparent;
   color: var(--amo-purple);
-  border: 2px solid var(--amo-purple);
+  border: 1.5px solid var(--amo-purple);
 }
 
-.amo-btn-outline:hover {
+.amo-btn-outline:hover:not(:disabled) {
   background: var(--amo-purple);
   color: white;
 }
 
+/* Ghost — No background */
 .amo-btn-ghost {
   background: transparent;
-  color: var(--amo-gray-700);
+  color: var(--amo-gray-500);
   box-shadow: none;
 }
 
-.amo-btn-ghost:hover {
+.amo-btn-ghost:hover:not(:disabled) {
   background: var(--amo-gray-100);
+  color: var(--amo-gray-700);
 }
 
-/* Input Fields */
+/* ─── Inputs ─────────────────────────────────────────────── */
+
 .amo-input {
-  padding: 1rem 1.5rem;
-  border-radius: var(--amo-radius-full);
-  border: 2px solid var(--amo-gray-200);
+  padding: 0.8125rem 1.125rem;
+  border-radius: var(--amo-radius-md);
+  border: 1.5px solid var(--amo-gray-200);
   font-size: var(--amo-font-size-base);
+  font-family: var(--amo-font-family);
   width: 100%;
-  transition: all 0.3s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
   background: white;
+  color: var(--amo-gray-700);
+  box-sizing: border-box;
 }
 
 .amo-input:focus {
   outline: none;
   border-color: var(--amo-purple);
-  box-shadow: 0 0 0 3px rgba(139, 125, 216, 0.1);
+  box-shadow: 0 0 0 3px rgba(108, 93, 211, 0.12);
 }
 
 .amo-input::placeholder {
-  color: var(--amo-gray-400);
+  color: var(--amo-gray-300);
 }
 
-/* Cards */
+.amo-input:disabled {
+  background: var(--amo-gray-50);
+  color: var(--amo-gray-400);
+  cursor: not-allowed;
+}
+
+/* ─── Cards ──────────────────────────────────────────────── */
+
 .amo-card {
   background: white;
   border-radius: var(--amo-radius-lg);
   padding: var(--amo-space-8);
-  box-shadow: var(--amo-shadow-md);
-  transition: all 0.3s ease;
+  box-shadow: var(--amo-shadow-sm);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.2s ease;
 }
 
 .amo-card:hover {
-  box-shadow: var(--amo-shadow-lg);
-  transform: translateY(-4px);
+  box-shadow: var(--amo-shadow-md);
 }
 
 .amo-card-pricing {
@@ -173,17 +231,18 @@ body {
   padding: var(--amo-space-8);
   box-shadow: var(--amo-shadow-md);
   text-align: center;
-  transition: all 0.3s ease;
-  border: 2px solid transparent;
+  transition: all 0.2s ease;
+  border: 1.5px solid transparent;
 }
 
 .amo-card-pricing:hover {
   border-color: var(--amo-green);
   box-shadow: var(--amo-shadow-xl);
-  transform: scale(1.05);
+  transform: scale(1.02);
 }
 
-/* Progress Steps */
+/* ─── Progress Steps ─────────────────────────────────────── */
+
 .amo-steps {
   display: flex;
   gap: var(--amo-space-2);
@@ -192,19 +251,20 @@ body {
 
 .amo-step {
   flex: 1;
-  padding: 0.75rem 1.5rem;
+  padding: 0.625rem 1.25rem;
   border-radius: var(--amo-radius-full);
-  background: var(--amo-gray-200);
-  color: var(--amo-gray-600);
+  background: var(--amo-gray-100);
+  color: var(--amo-gray-400);
   font-weight: 600;
   text-align: center;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+  font-size: var(--amo-font-size-sm);
 }
 
 .amo-step.active {
   background: var(--amo-purple);
   color: white;
-  box-shadow: var(--amo-shadow-md);
+  box-shadow: 0 2px 8px rgba(108, 93, 211, 0.28);
 }
 
 .amo-step.completed {
@@ -212,31 +272,21 @@ body {
   color: white;
 }
 
-/* Hero Section */
+/* ─── Hero Section ───────────────────────────────────────── */
+
 .amo-hero {
-  background: var(--amo-gradient-bg);
+  background: var(--amo-off-white);
   padding: var(--amo-space-24) var(--amo-space-8);
-  border-radius: 0 0 var(--amo-radius-xl) var(--amo-radius-xl);
   position: relative;
   overflow: hidden;
 }
 
-.amo-hero::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -10%;
-  width: 40%;
-  height: 150%;
-  background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
-  border-radius: 50%;
-}
+/* ─── Feature Icons ──────────────────────────────────────── */
 
-/* Feature Icons */
 .amo-feature-icon {
-  width: 80px;
-  height: 80px;
-  border-radius: var(--amo-radius-lg);
+  width: 56px;
+  height: 56px;
+  border-radius: var(--amo-radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -245,37 +295,21 @@ body {
   box-shadow: var(--amo-shadow-md);
 }
 
-/* Testimonial */
-.amo-testimonial {
-  background: white;
-  padding: var(--amo-space-8);
-  border-radius: var(--amo-radius-xl);
-  box-shadow: var(--amo-shadow-lg);
-  position: relative;
-}
+/* ─── Navigation ─────────────────────────────────────────── */
 
-.amo-testimonial::before {
-  content: '"';
-  font-size: 6rem;
-  color: var(--amo-purple);
-  opacity: 0.2;
-  position: absolute;
-  top: -2rem;
-  left: 1rem;
-  font-family: Georgia, serif;
-}
-
-/* Navigation */
 .amo-nav {
-  background: white;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   padding: var(--amo-space-4) var(--amo-space-8);
-  box-shadow: var(--amo-shadow-sm);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
   position: sticky;
   top: 0;
   z-index: 100;
 }
 
-/* Utility Classes */
+/* ─── Utilities ──────────────────────────────────────────── */
+
 .amo-container {
   max-width: 1200px;
   margin: 0 auto;
@@ -298,11 +332,12 @@ body {
 .amo-mt-4 { margin-top: var(--amo-space-4); }
 .amo-mt-8 { margin-top: var(--amo-space-8); }
 
-/* Animations */
+/* ─── Animations ─────────────────────────────────────────── */
+
 @keyframes amo-fade-in {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -311,10 +346,193 @@ body {
 }
 
 .amo-fade-in {
-  animation: amo-fade-in 0.6s ease-out;
+  animation: amo-fade-in 0.4s ease-out both;
 }
 
-/* Responsive */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Auth Pages ─────────────────────────────────────────── */
+
+.amo-auth-page {
+  min-height: 100vh;
+  background: var(--amo-off-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.amo-auth-card {
+  background: white;
+  border-radius: var(--amo-radius-xl);
+  padding: 2.5rem;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: var(--amo-shadow-lg);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  animation: amo-fade-in 0.4s ease-out both;
+}
+
+/* ─── Logo ───────────────────────────────────────────────── */
+
+.amopagar-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+}
+
+.amopagar-logo-icon {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #00C9A7 0%, #6C5DD3 100%);
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 800;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.amopagar-logo-text {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: -0.01em;
+}
+
+/* ─── Toggle / Tab Switcher ──────────────────────────────── */
+
+.amo-toggle {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--amo-gray-100);
+  border: 1px solid var(--amo-gray-200);
+  padding: 0.25rem;
+  border-radius: var(--amo-radius-full);
+  margin-bottom: 1.5rem;
+}
+
+.amo-toggle-btn {
+  flex: 1;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: var(--amo-radius-full);
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  background: transparent;
+  color: var(--amo-gray-500);
+  font-family: var(--amo-font-family);
+}
+
+.amo-toggle-btn.active {
+  background: white;
+  color: var(--amo-gray-800);
+  box-shadow: var(--amo-shadow-sm);
+}
+
+/* ─── Alerts ─────────────────────────────────────────────── */
+
+.amo-alert {
+  border-radius: var(--amo-radius-md);
+  padding: 0.875rem 1rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+}
+
+.amo-alert-error {
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #991B1B;
+}
+
+.amo-alert-success {
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  color: #166534;
+}
+
+.amo-alert-info {
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  color: #1E40AF;
+}
+
+.amo-alert-warning {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  color: #92400E;
+}
+
+/* ─── Status Badges ──────────────────────────────────────── */
+
+.amo-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--amo-radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.amo-badge-success {
+  background: #DCFCE7;
+  color: #166534;
+}
+
+.amo-badge-pending {
+  background: #FEF9C3;
+  color: #854D0E;
+}
+
+.amo-badge-error {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
+.amo-badge-info {
+  background: #DBEAFE;
+  color: #1E40AF;
+}
+
+/* ─── Divider ─────────────────────────────────────────────── */
+
+.amo-divider {
+  position: relative;
+  margin: 1.5rem 0;
+  text-align: center;
+}
+
+.amo-divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--amo-gray-200);
+}
+
+.amo-divider span {
+  position: relative;
+  background: white;
+  padding: 0 1rem;
+  color: var(--amo-gray-400);
+  font-size: 0.8125rem;
+}
+
+/* ─── Responsive ─────────────────────────────────────────── */
+
 @media (max-width: 768px) {
   .amo-hero {
     padding: var(--amo-space-12) var(--amo-space-4);
@@ -326,5 +544,30 @@ body {
 
   .amo-card {
     padding: var(--amo-space-6);
+  }
+
+  .amo-auth-card {
+    padding: 1.75rem 1.25rem;
+    border-radius: var(--amo-radius-lg);
+  }
+
+  .amo-btn {
+    padding: 0.75rem 1.5rem;
+  }
+}
+
+/* ─── Focus Accessibility ────────────────────────────────── */
+
+:focus-visible {
+  outline: 2px solid var(--amo-purple);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .amo-fade-in {
+    animation: none;
+  }
+  .amo-btn {
+    transition: none;
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -15,6 +15,7 @@ type Profile = {
   avatar_url: string | null;
   stripe_account_id: string | null;
   stripe_account_status: string | null;
+  pix_key: string | null;
 };
 
 type FormState = {
@@ -51,8 +52,16 @@ export default function MeusDadosPage() {
   const [loadingStripeStatus, setLoadingStripeStatus] = useState(false);
   const [loadingStripeLink, setLoadingStripeLink] = useState(false);
 
+  // PIX key state
+  const [pixKeyInput, setPixKeyInput] = useState('');
+  const [pixKeyEditing, setPixKeyEditing] = useState(false);
+  const [pixKeyError, setPixKeyError] = useState<string | null>(null);
+  const [pixKeyLoading, setPixKeyLoading] = useState(false);
+  const [showPixConfirm, setShowPixConfirm] = useState(false);
+  const [pixConfirmChecked, setPixConfirmChecked] = useState(false);
+
   // Fetch Stripe account status
-  const fetchStripeStatus = async () => {
+  const fetchStripeStatus = useCallback(async () => {
     if (!profile?.stripe_account_id) return;
     
     try {
@@ -73,11 +82,11 @@ export default function MeusDadosPage() {
     } finally {
       setLoadingStripeStatus(false);
     }
-  };
+  }, [profile?.stripe_account_id]);
 
   // Define fetchProfile outside useEffect so it can be called from other functions
   // Fetch profile data
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
       setLoading(true);
       const resp = await fetch("/api/motorista/profile");
@@ -99,12 +108,12 @@ export default function MeusDadosPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
   
   // Load profile on page load
   useEffect(() => {
     fetchProfile();
-  }, []);
+  }, [fetchProfile]);
 
 
   // Fetch Stripe status when profile changes
@@ -112,7 +121,7 @@ export default function MeusDadosPage() {
     if (profile?.stripe_account_id) {
       fetchStripeStatus();
     }
-  }, [profile]);
+  }, [fetchStripeStatus, profile?.stripe_account_id]);
 
   // Handle form submission
   const handleSubmit = async () => {
@@ -160,7 +169,7 @@ export default function MeusDadosPage() {
   };
 
   // Handle input changes
-  const handleChange = (e) => {
+  const handleChange = (e: { target: { name: string; value: string } }) => {
     const { name, value } = e.target;
     setFormState((prev) => ({ ...prev, [name]: value }));
   };
@@ -200,6 +209,85 @@ export default function MeusDadosPage() {
     } finally {
       setLoadingStripeLink(false);
     }
+  };
+
+  // PIX key helpers
+  const detectPixKeyType = (key: string): string => {
+    const k = key.trim();
+    if (!k) return '';
+    if (k.includes('@')) return 'E-mail';
+    if (k.startsWith('+55') || (k.startsWith('+') && !k.includes('@'))) return 'Telefone';
+    if (k.length === 11 && /^\d{11}$/.test(k)) return 'CPF';
+    if (k.length === 14 && /^\d{14}$/.test(k)) return 'CNPJ';
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(k)) return 'Chave Aleatória';
+    if ((k.length === 10 || k.length === 11) && /^\d+$/.test(k)) return 'Telefone';
+    return '';
+  };
+
+  const validatePixKeyLocal = (key: string): string | null => {
+    const k = key.trim();
+    if (!k) return 'Informe a chave Pix.';
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (k.includes('@') && !emailRegex.test(k)) return 'E-mail inválido.';
+    if (k.startsWith('+') && !/^\+55\d{10,11}$/.test(k)) return 'Telefone inválido. Use o formato +55XXXXXXXXXXX.';
+    if (k.length === 11 && /^\d{11}$/.test(k)) return null; // CPF
+    if (k.length === 14 && /^\d{14}$/.test(k)) return null; // CNPJ
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(k)) return null; // UUID
+    if ((k.length === 10 || k.length === 11) && /^\d+$/.test(k)) return null; // phone no prefix
+    if (!k.includes('@') && !k.startsWith('+') && !/^\d+$/.test(k) && !/^[0-9a-f-]+$/i.test(k)) {
+      return 'Formato de chave Pix não reconhecido.';
+    }
+    return null;
+  };
+
+  const handlePixKeySave = async () => {
+    const validationError = validatePixKeyLocal(pixKeyInput);
+    if (validationError) {
+      setPixKeyError(validationError);
+      return;
+    }
+    setShowPixConfirm(true);
+    setPixConfirmChecked(false);
+  };
+
+  const handlePixKeyConfirm = async () => {
+    if (!pixConfirmChecked) return;
+    setPixKeyLoading(true);
+    setPixKeyError(null);
+    try {
+      const resp = await fetch('/api/motorista/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pix_key: pixKeyInput.trim() }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Erro ao salvar chave Pix.');
+      if (data.profile) {
+        setProfile(data.profile);
+      } else {
+        await fetchProfile();
+      }
+      setPixKeyEditing(false);
+      setShowPixConfirm(false);
+      setPixKeyInput('');
+    } catch (err: any) {
+      setPixKeyError(err.message);
+    } finally {
+      setPixKeyLoading(false);
+    }
+  };
+
+  const handlePixKeyEdit = () => {
+    setPixKeyInput(profile?.pix_key || '');
+    setPixKeyError(null);
+    setPixKeyEditing(true);
+  };
+
+  const handlePixKeyCancel = () => {
+    setPixKeyEditing(false);
+    setPixKeyInput('');
+    setPixKeyError(null);
+    setShowPixConfirm(false);
   };
 
   // Status display helpers
@@ -365,6 +453,118 @@ export default function MeusDadosPage() {
             />
           ) : (
             <p className="text-gray-900 mt-1">{profile.profissao || "-"}</p>
+          )}
+        </div>
+
+        {/* PIX Key Section */}
+        <div className="mt-6 p-4 border rounded-lg bg-gray-50">
+          <h3 className="text-lg font-semibold mb-3">Chave Pix</h3>
+
+          {!pixKeyEditing ? (
+            <div className="flex items-center justify-between">
+              <div>
+                {profile.pix_key ? (
+                  <div>
+                    <p className="text-sm text-gray-500 mb-0.5">
+                      {detectPixKeyType(profile.pix_key)}
+                    </p>
+                    <p className="text-gray-900 font-mono text-sm break-all">{profile.pix_key}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Nenhuma chave cadastrada</p>
+                )}
+              </div>
+              <button
+                onClick={handlePixKeyEdit}
+                className="ml-4 text-sm text-indigo-600 hover:text-indigo-800 whitespace-nowrap"
+              >
+                {profile.pix_key ? 'Alterar' : 'Adicionar chave'}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Sua chave Pix
+                </label>
+                <input
+                  type="text"
+                  value={pixKeyInput}
+                  onChange={(e) => {
+                    setPixKeyInput(e.target.value);
+                    setPixKeyError(null);
+                  }}
+                  placeholder="CPF, CNPJ, e-mail, telefone ou chave aleatória"
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  disabled={pixKeyLoading}
+                  autoFocus
+                />
+                {pixKeyInput && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Tipo detectado: <span className="font-medium">{detectPixKeyType(pixKeyInput) || 'Não reconhecido'}</span>
+                  </p>
+                )}
+                {pixKeyError && (
+                  <p className="mt-1 text-sm text-red-600">{pixKeyError}</p>
+                )}
+              </div>
+
+              {!showPixConfirm ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={handlePixKeySave}
+                    disabled={pixKeyLoading || !pixKeyInput.trim()}
+                    className="bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    Continuar
+                  </button>
+                  <button
+                    onClick={handlePixKeyCancel}
+                    disabled={pixKeyLoading}
+                    className="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-300 disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <div className="border border-amber-300 bg-amber-50 rounded-lg p-4 space-y-3">
+                  <p className="text-sm font-semibold text-amber-900">Confirme sua chave Pix</p>
+                  <p className="text-sm text-amber-800">
+                    Chave a salvar: <span className="font-mono font-semibold">{pixKeyInput.trim()}</span>
+                  </p>
+                  <p className="text-sm text-amber-800">
+                    Se esta chave estiver incorreta, os pagamentos irão para outra pessoa e não poderão ser estornados.
+                  </p>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={pixConfirmChecked}
+                      onChange={(e) => setPixConfirmChecked(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                    />
+                    <span className="text-sm text-amber-900 font-medium">
+                      Confirmo que esta chave está correta. Erros são de minha responsabilidade.
+                    </span>
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handlePixKeyConfirm}
+                      disabled={!pixConfirmChecked || pixKeyLoading}
+                      className="bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      {pixKeyLoading ? 'Salvando...' : 'Salvar chave'}
+                    </button>
+                    <button
+                      onClick={() => setShowPixConfirm(false)}
+                      disabled={pixKeyLoading}
+                      className="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-300 disabled:opacity-50"
+                    >
+                      Voltar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
 

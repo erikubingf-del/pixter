@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
+import { sanitizeInternalCallbackUrl } from '@/lib/utils/navigation';
 
 /**
  * Global middleware that:
  *  1. Checks NextAuth session
  *  2. Protects API routes (only specific ones are public)
  *  3. Redirects unauthenticated users away from protected pages
- *  4. Enforces role-based access (motorista vs cliente)
+ *  4. Preserves callback routing without hard-coding a single-role session model
  */
 export async function middleware(req: NextRequest) {
   const session = await getToken({
@@ -25,7 +26,6 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/login') ||
     pathname.startsWith('/cadastro') ||
     pathname.startsWith('/motorista/login') ||
-    pathname.startsWith('/motorista/cadastro') ||
     pathname.startsWith('/images') ||
     pathname.startsWith('/termos') ||
     pathname.startsWith('/privacidade') ||
@@ -35,6 +35,7 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/api/auth') ||
     // Public API routes
     pathname.startsWith('/api/public') ||
+    pathname === '/api/health' ||
     // Stripe webhook (verified by signature, not session)
     pathname === '/api/stripe/webhook' ||
     // Customer-facing payment creation (no login required)
@@ -43,7 +44,7 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/api/stripe/check-pix-status') ||
     // Pix payment routes (guest payments)
     pathname.startsWith('/api/pix') ||
-    // Auth callback
+    // Auth callbacks
     pathname.startsWith('/auth/callback');
 
   // Dynamic phone number routes (e.g., /5511999999999)
@@ -59,12 +60,13 @@ export async function middleware(req: NextRequest) {
       const isMotoristaLoginPage =
         pathname === '/motorista/login';
 
-      const userType = (session.tipo as string) || 'cliente';
+      const callbackUrl = sanitizeInternalCallbackUrl(
+        req.nextUrl.searchParams.get('callbackUrl'),
+        '/auth/post-login'
+      );
 
-      if (isLoginPage || (isMotoristaLoginPage && userType === 'cliente')) {
-        return NextResponse.redirect(new URL('/cliente/dashboard', req.url));
-      } else if (isMotoristaLoginPage && userType === 'motorista') {
-        return NextResponse.redirect(new URL('/motorista/dashboard', req.url));
+      if (isLoginPage || isMotoristaLoginPage) {
+        return NextResponse.redirect(new URL(callbackUrl, req.url));
       }
     }
     return NextResponse.next();
@@ -73,12 +75,7 @@ export async function middleware(req: NextRequest) {
   // --- Protected routes: require authentication ---
   if (!isAuthenticated) {
     const loginUrl = req.nextUrl.clone();
-
-    if (pathname.startsWith('/motorista') || pathname.startsWith('/api/motorista')) {
-      loginUrl.pathname = '/motorista/login';
-    } else {
-      loginUrl.pathname = '/login';
-    }
+    loginUrl.pathname = '/login';
 
     // For API routes, return 401 instead of redirect
     if (pathname.startsWith('/api')) {
@@ -88,37 +85,9 @@ export async function middleware(req: NextRequest) {
       );
     }
 
-    loginUrl.searchParams.set('callbackUrl', pathname);
+    const callbackUrl = req.nextUrl.search || '';
+    loginUrl.searchParams.set('callbackUrl', `${pathname}${callbackUrl}`);
     return NextResponse.redirect(loginUrl);
-  }
-
-  // --- Role-based access control ---
-  const userType = (session.tipo as string) || 'cliente';
-
-  // Motorista routes require motorista role
-  if (pathname.startsWith('/motorista') || pathname.startsWith('/api/motorista')) {
-    if (userType !== 'motorista') {
-      if (pathname.startsWith('/api/')) {
-        return NextResponse.json(
-          { error: 'Acesso negado' },
-          { status: 403 }
-        );
-      }
-      return NextResponse.redirect(new URL('/cliente/dashboard', req.url));
-    }
-  }
-
-  // Cliente routes require cliente role
-  if (pathname.startsWith('/cliente') || pathname.startsWith('/api/client')) {
-    if (userType !== 'cliente') {
-      if (pathname.startsWith('/api/')) {
-        return NextResponse.json(
-          { error: 'Acesso negado' },
-          { status: 403 }
-        );
-      }
-      return NextResponse.redirect(new URL('/motorista/dashboard', req.url));
-    }
   }
 
   return NextResponse.next();

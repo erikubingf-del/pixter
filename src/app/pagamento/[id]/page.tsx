@@ -1,20 +1,25 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useSession } from "next-auth/react"
 import {
   loadStripe,
   StripeElementsOptions,
+  type StripeExpressCheckoutElementConfirmEvent,
+  type StripeExpressCheckoutElementReadyEvent,
 } from "@stripe/stripe-js"
 import {
   Elements,
+  ExpressCheckoutElement,
   PaymentElement,
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js"
 import Link from "next/link"
+import Image from "next/image"
 import '../../../styles/amopagar-theme.css'
+import { buildPathWithSearch } from "@/lib/utils/navigation"
 
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
@@ -45,15 +50,13 @@ function formatDisplayPhoneNumber(e164Phone?: string): string {
 }
 
 export default function PaginaPagamento() {
-  const { data: session } = useSession()
   const { id: driverIdentifier } = useParams() as { id: string }
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loadingProfile, setLoadingProfile] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const [clientSecret, setClientSecret] = useState<string | null>(null)
-  const [ephemeralKeySecret, setEphemeralKeySecret] = useState<string | null>(null)
-  const [loadingIntent, setLoadingIntent] = useState(true)
+  const [loadingIntent, setLoadingIntent] = useState(false)
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null)
 
   // Fetch driver info
@@ -61,6 +64,7 @@ export default function PaginaPagamento() {
     async function fetchDriver() {
       if (!driverIdentifier) {
         setError("Identificador do motorista não encontrado na URL.")
+        setLoadingIntent(false)
         setLoadingProfile(false)
         return
       }
@@ -73,6 +77,7 @@ export default function PaginaPagamento() {
       } catch (err: any) {
         console.error("Erro ao buscar motorista:", err)
         setError(err.message)
+        setLoadingIntent(false)
       } finally {
         setLoadingProfile(false)
       }
@@ -158,7 +163,9 @@ export default function PaginaPagamento() {
         padding: '2rem'
       }}>
         <div className="amo-card" style={{ maxWidth: '480px', textAlign: 'center' }}>
-          <span style={{ fontSize: '4rem', marginBottom: '1rem', display: 'block' }}>⚠️</span>
+          <div style={{ width: '64px', height: '64px', background: '#FEF3C7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+            <svg width="28" height="28" fill="none" stroke="#D97706" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+          </div>
           <h2 style={{
             fontSize: '1.5rem',
             fontWeight: '700',
@@ -190,7 +197,9 @@ export default function PaginaPagamento() {
         padding: '2rem'
       }}>
         <div className="amo-card" style={{ maxWidth: '480px', textAlign: 'center' }}>
-          <span style={{ fontSize: '4rem', marginBottom: '1rem', display: 'block' }}>⚠️</span>
+          <div style={{ width: '64px', height: '64px', background: '#FEF3C7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+            <svg width="28" height="28" fill="none" stroke="#D97706" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+          </div>
           <h2 style={{
             fontSize: '1.5rem',
             fontWeight: '700',
@@ -222,7 +231,6 @@ export default function PaginaPagamento() {
     ? {
         clientSecret,
         appearance: { theme: "stripe" },
-        ...(ephemeralKeySecret && { customerId: session?.user?.id, ephemeralKeySecret }),
       }
     : undefined
 
@@ -272,9 +280,23 @@ export default function PaginaPagamento() {
               fontSize: '2rem',
               color: 'white',
               fontWeight: '800',
-              flexShrink: 0
+              flexShrink: 0,
+              overflow: 'hidden'
             }}>
-              {profile.nome?.charAt(0).toUpperCase() || '💳'}
+              {profile.avatar_url ? (
+                <div
+                  aria-hidden="true"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    backgroundImage: `url(${profile.avatar_url})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                  }}
+                />
+              ) : (
+                profile.nome?.charAt(0).toUpperCase() || '💳'
+              )}
             </div>
             <div style={{ flex: 1 }}>
               <p style={{
@@ -308,13 +330,9 @@ export default function PaginaPagamento() {
 
         {/* Payment Form Card */}
         <div className="amo-card amo-fade-in">
-          {options ? (
-            <Elements stripe={stripePromise} options={options}>
-              {paymentForm}
-            </Elements>
-          ) : (
-            paymentForm
-          )}
+          <Elements stripe={stripePromise} options={options}>
+            {paymentForm}
+          </Elements>
         </div>
       </div>
     </main>
@@ -334,25 +352,44 @@ function CheckoutForm({
   const elements = useElements()
   const router = useRouter()
   const { id: driverIdentifier } = useParams() as { id: string }
+  const pathname = usePathname() || `/pagamento/${driverIdentifier}`
+  const searchParams = useSearchParams()
+  const { data: session, status } = useSession()
 
   const [amount, setAmount] = useState("")
   const [amountError, setAmountError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [walletsAvailable, setWalletsAvailable] = useState(false)
+  const [walletsChecked, setWalletsChecked] = useState(false)
 
   // Determine available payment methods
   const hasPixKey = !!profile.has_pix
   const hasStripe = !!profile.has_stripe
 
-  // Default to Pix if available, otherwise Card
+  // Prefer card first so Apple Pay / Google Pay appear immediately when available.
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
-    hasPixKey ? 'pix' : 'card'
+    hasStripe ? 'card' : 'pix'
   )
 
   // Pix-specific state
   const [pixPayload, setPixPayload] = useState<string | null>(null)
   const [pixQrCode, setPixQrCode] = useState<string | null>(null)
   const [showPixCode, setShowPixCode] = useState(false)
+  const callbackUrl = buildPathWithSearch(pathname, searchParams)
+  const loginHref = `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`
+  const signupHref = `/cadastro?callbackUrl=${encodeURIComponent(callbackUrl)}`
+
+  useEffect(() => {
+    if (!hasStripe && paymentMethod === 'card') {
+      setPaymentMethod('pix')
+      return
+    }
+
+    if (hasStripe && !hasPixKey && paymentMethod !== 'card') {
+      setPaymentMethod('card')
+    }
+  }, [hasPixKey, hasStripe, paymentMethod])
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, "")
@@ -379,6 +416,90 @@ function CheckoutForm({
       style: 'currency',
       currency: 'BRL'
     }).format(num)
+  }
+
+  const getSuccessUrl = (amountInCents: number, intentId?: string | null) => {
+    const url = new URL('/pagamento/sucesso', window.location.origin)
+    url.searchParams.set('amount', amountInCents.toString())
+    url.searchParams.set('vendor', encodeURIComponent(profile.nome || 'Vendedor'))
+
+    if (intentId || paymentIntentId) {
+      url.searchParams.set('payment_intent', intentId || paymentIntentId || '')
+    }
+
+    return url.toString()
+  }
+
+  const pushSuccessPage = (amountInCents: number, intentId?: string | null) => {
+    const successUrl = new URL(getSuccessUrl(amountInCents, intentId))
+    router.push(`${successUrl.pathname}${successUrl.search}`)
+  }
+
+  const updatePaymentIntentAmount = async (amountInCents: number) => {
+    const updateRes = await fetch("/api/stripe/update-payment-intent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paymentIntentId, amount: amountInCents }),
+    })
+    const updateData = await updateRes.json()
+
+    if (!updateRes.ok) {
+      throw new Error(updateData.error || "Erro ao atualizar valor do pagamento.")
+    }
+  }
+
+  const confirmCardPayment = async (amountInCents: number) => {
+    if (!stripe || !elements) {
+      throw new Error('Stripe não carregado')
+    }
+
+    await updatePaymentIntentAmount(amountInCents)
+
+    const result = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: getSuccessUrl(amountInCents, paymentIntentId),
+      },
+      redirect: 'if_required',
+    })
+
+    if (result.error) {
+      throw new Error(
+        result.error.message || "Ocorreu um erro durante a confirmação do pagamento."
+      )
+    }
+
+    if (result.paymentIntent) {
+      pushSuccessPage(amountInCents, result.paymentIntent.id)
+    }
+  }
+
+  const handleExpressCheckoutConfirm = async (
+    event: StripeExpressCheckoutElementConfirmEvent
+  ) => {
+    const amountInCents = parseInt(amount, 10)
+
+    if (!amount || amountInCents <= 0) {
+      setAmountError("Digite um valor antes de confirmar o pagamento.")
+      event.paymentFailed({ reason: 'fail' })
+      return
+    }
+
+    setSubmitting(true)
+    setError(null)
+    setAmountError(null)
+
+    try {
+      await confirmCardPayment(amountInCents)
+    } catch (err: any) {
+      console.error("Express checkout error:", err)
+      setError(err.message || "Ocorreu um erro ao iniciar o pagamento.")
+      event.paymentFailed({ reason: 'fail' })
+      setSubmitting(false)
+      return
+    }
+
+    setSubmitting(false)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -449,38 +570,7 @@ function CheckoutForm({
         setShowPixCode(true)
         setSubmitting(false)
       } else {
-        // Card payment via Stripe
-        if (!stripe || !elements) {
-          throw new Error('Stripe não carregado')
-        }
-
-        // Update the Payment Intent with the final amount
-        const updateRes = await fetch("/api/stripe/update-payment-intent", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ paymentIntentId, amount: amountInCents }),
-        })
-        const updateData = await updateRes.json()
-        if (!updateRes.ok) {
-          throw new Error(updateData.error || "Erro ao atualizar valor do pagamento.")
-        }
-
-        // Confirm the payment
-        const vendorName = encodeURIComponent(profile.nome || 'Vendedor')
-        const { error: stripeError } = await stripe.confirmPayment({
-          elements,
-          confirmParams: {
-            return_url:
-              typeof window !== "undefined"
-                ? `${window.location.origin}/pagamento/sucesso?amount=${amountInCents}&vendor=${vendorName}`
-                : undefined,
-          },
-        })
-
-        if (stripeError) {
-          console.error("Stripe confirmation error:", stripeError)
-          throw new Error(stripeError.message || "Ocorreu um erro durante a confirmação do pagamento.")
-        }
+        await confirmCardPayment(amountInCents)
       }
     } catch (err: any) {
       console.error("Payment submission error:", err)
@@ -527,9 +617,12 @@ function CheckoutForm({
             textAlign: 'center',
             border: '2px solid #E4E7EB'
           }}>
-            <img
+            <Image
               src={pixQrCode}
               alt="QR Code Pix"
+              width={320}
+              height={320}
+              unoptimized
               style={{
                 maxWidth: '100%',
                 height: 'auto',
@@ -598,7 +691,7 @@ function CheckoutForm({
             <li>Abra o app do seu banco</li>
             <li>Escaneie o QR Code ou copie o código</li>
             <li>Confirme o pagamento de {formatAmount(amount)}</li>
-            <li>O recebedor será notificado automaticamente</li>
+            <li>Guarde o comprovante após concluir o Pix</li>
           </ol>
         </div>
 
@@ -770,6 +863,56 @@ function CheckoutForm({
       {/* Payment Method Details */}
       {paymentMethod === 'card' ? (
         <div>
+          {status !== 'authenticated' && (
+            <div style={{
+              background: 'linear-gradient(135deg, #EFF6FF 0%, #F5F3FF 100%)',
+              borderRadius: 'var(--amo-radius-md)',
+              padding: '1rem',
+              border: '2px solid #C4B5FD',
+              marginBottom: '0.75rem'
+            }}>
+              <p style={{ fontSize: '0.9rem', fontWeight: '700', color: '#312E81', marginBottom: '0.35rem' }}>
+                Entre para pagar mais rápido
+              </p>
+              <p style={{ fontSize: '0.8rem', color: '#4338CA', marginBottom: '0.75rem' }}>
+                Voltamos você para esta cobrança e seus cartões ficam salvos com mais facilidade.
+              </p>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <Link href={loginHref} className="amo-btn amo-btn-outline" style={{ flex: 1, minWidth: '150px', textAlign: 'center' }}>
+                  Entrar
+                </Link>
+                <Link href={signupHref} className="amo-btn amo-btn-secondary" style={{ flex: 1, minWidth: '150px', textAlign: 'center' }}>
+                  Criar conta
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {status === 'authenticated' && (
+            <div style={{
+              background: '#F9FAFB',
+              borderRadius: 'var(--amo-radius-md)',
+              padding: '1rem',
+              border: '2px solid #E5E7EB',
+              marginBottom: '0.75rem'
+            }}>
+              <p style={{ fontSize: '0.9rem', fontWeight: '700', color: '#111827', marginBottom: '0.35rem' }}>
+                Conta conectada
+              </p>
+              <p style={{ fontSize: '0.8rem', color: '#4B5563', marginBottom: '0.75rem' }}>
+                Use sua carteira para salvar e revisar cartões sempre com o mesmo login.
+              </p>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <Link href="/cliente/payment-methods" className="amo-btn amo-btn-outline" style={{ flex: 1, minWidth: '150px', textAlign: 'center' }}>
+                  Meus cartões
+                </Link>
+                <Link href="/cliente/dashboard/historico" className="amo-btn amo-btn-outline" style={{ flex: 1, minWidth: '150px', textAlign: 'center' }}>
+                  Histórico
+                </Link>
+              </div>
+            </div>
+          )}
+
           <label style={{
             display: 'block',
             fontSize: '0.875rem',
@@ -798,6 +941,55 @@ function CheckoutForm({
                 Apple Pay, Google Pay ou cartão de crédito/débito
               </p>
             </div>
+          </div>
+          <div style={{
+            background: '#FFFFFF',
+            borderRadius: 'var(--amo-radius-md)',
+            padding: '1rem',
+            border: '2px solid #E5E7EB',
+            marginBottom: '0.75rem'
+          }}>
+            <p style={{
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: '#1F2933',
+              marginBottom: '0.5rem'
+            }}>
+              Pague com um toque
+            </p>
+            <ExpressCheckoutElement
+              options={{
+                buttonHeight: 48,
+                layout: { maxColumns: 2, maxRows: 1, overflow: 'auto' },
+                paymentMethodOrder: ['apple_pay', 'google_pay'],
+                wallets: { applePay: 'auto', googlePay: 'auto' },
+              }}
+              onClick={(event) =>
+                event.resolve({
+                  business: { name: 'AmoPagar' },
+                  emailRequired: !session?.user?.email,
+                })
+              }
+              onReady={(event: StripeExpressCheckoutElementReadyEvent) => {
+                setWalletsChecked(true)
+                setWalletsAvailable(
+                  Boolean(
+                    event.availablePaymentMethods?.applePay ||
+                      event.availablePaymentMethods?.googlePay
+                  )
+                )
+              }}
+              onConfirm={handleExpressCheckoutConfirm}
+            />
+            <p style={{
+              fontSize: '0.75rem',
+              color: walletsChecked && walletsAvailable ? '#047857' : '#6B7280',
+              marginTop: '0.75rem'
+            }}>
+              {walletsChecked && walletsAvailable
+                ? 'Apple Pay e Google Pay estão prontos neste dispositivo.'
+                : 'Apple Pay e Google Pay aparecem automaticamente em dispositivos e navegadores compatíveis.'}
+            </p>
           </div>
           <PaymentElement id="payment-element" options={{ layout: "tabs" }} />
         </div>

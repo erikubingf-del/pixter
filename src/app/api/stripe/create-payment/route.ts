@@ -4,8 +4,6 @@ import { supabaseServer } from '@/lib/supabase/client';
 import stripe, { calculateFee, validateAmount } from '@/lib/stripe/server';
 import { safeErrorResponse } from '@/lib/utils/api-error';
 
-const MIN_AMOUNT_BRL = 2.00;
-
 export async function POST(request: Request) {
   try {
     const session = await requireAuth();
@@ -21,11 +19,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Corpo da requisição inválido' }, { status: 400 });
     }
 
-    if (!driverId || isNaN(amount) || amount < MIN_AMOUNT_BRL || (tipAmount !== undefined && (isNaN(tipAmount) || tipAmount < 0))) {
-      return NextResponse.json(
-        { error: `Dados inválidos. Certifique-se que o valor é pelo menos R$${MIN_AMOUNT_BRL.toFixed(2)}.` },
-        { status: 400 }
-      );
+    if (!driverId || isNaN(amount) || (tipAmount !== undefined && (isNaN(tipAmount) || tipAmount < 0))) {
+      return NextResponse.json({ error: 'Dados inválidos.' }, { status: 400 });
+    }
+
+    const baseAmountCents = Math.round(amount * 100);
+    const amountError = validateAmount(baseAmountCents);
+    if (amountError) {
+      return NextResponse.json({ error: amountError }, { status: 400 });
     }
 
     const { data: driverProfile, error: driverError } = await supabaseServer
@@ -43,7 +44,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Motorista não está habilitado para receber pagamentos online.' }, { status: 400 });
     }
 
-    const baseAmountCents = Math.round(amount * 100);
     const tipAmountCents = Math.round((tipAmount || 0) * 100);
     const totalAmountCents = baseAmountCents + tipAmountCents;
     const applicationFeeCents = calculateFee(baseAmountCents);
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
           currency: 'brl',
           product_data: {
             name: 'Pagamento para Motorista',
-            description: `Pixter - ${driverProfile.nome || 'Motorista'}`,
+            description: `AmoPagar - ${driverProfile.nome || 'Motorista'}`,
           },
           unit_amount: totalAmountCents,
         },
@@ -68,15 +68,15 @@ export async function POST(request: Request) {
         application_fee_amount: applicationFeeCents,
         transfer_data: { destination: driverProfile.stripe_account_id },
         metadata: {
-          pixter_driver_id: driverId,
-          pixter_user_id: userId,
-          pixter_base_amount_cents: baseAmountCents.toString(),
-          pixter_tip_amount_cents: tipAmountCents.toString(),
-          pixter_total_amount_cents: totalAmountCents.toString(),
-          pixter_fee_amount_cents: applicationFeeCents.toString(),
+          amopagar_driver_id: driverId,
+          amopagar_user_id: userId,
+          amopagar_base_amount_cents: baseAmountCents.toString(),
+          amopagar_tip_amount_cents: tipAmountCents.toString(),
+          amopagar_total_amount_cents: totalAmountCents.toString(),
+          amopagar_fee_amount_cents: applicationFeeCents.toString(),
         },
       },
-      metadata: { pixter_driver_id: driverId, pixter_user_id: userId },
+      metadata: { amopagar_driver_id: driverId, amopagar_user_id: userId },
     });
 
     if (!checkoutSession.url) {
