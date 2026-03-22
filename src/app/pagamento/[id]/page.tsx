@@ -49,6 +49,152 @@ function formatDisplayPhoneNumber(e164Phone?: string): string {
   return e164Phone
 }
 
+// ─── SVG Icons ──────────────────────────────────────────────────────────────
+
+function IconShield({ size = 16, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    </svg>
+  )
+}
+
+function IconCheck({ size = 14, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+  )
+}
+
+function IconCopy({ size = 16, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+    </svg>
+  )
+}
+
+function IconPhone({ size = 16, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+      <line x1="12" y1="18" x2="12.01" y2="18"/>
+    </svg>
+  )
+}
+
+function IconCreditCard({ size = 16, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+      <line x1="1" y1="10" x2="23" y2="10"/>
+    </svg>
+  )
+}
+
+function IconArrowLeft({ size = 16, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="19" y1="12" x2="5" y2="12"/>
+      <polyline points="12 19 5 12 12 5"/>
+    </svg>
+  )
+}
+
+function IconAlert({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+      <line x1="12" y1="9" x2="12" y2="13"/>
+      <line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+  )
+}
+
+function IconQrCode({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="3" width="7" height="7"/>
+      <rect x="14" y="3" width="7" height="7"/>
+      <rect x="3" y="14" width="7" height="7"/>
+      <rect x="14" y="14" width="3" height="3"/>
+      <line x1="21" y1="14" x2="21" y2="21"/>
+      <line x1="17" y1="21" x2="21" y2="21"/>
+    </svg>
+  )
+}
+
+function IconList({ size = 16, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="8" y1="6" x2="21" y2="6"/>
+      <line x1="8" y1="12" x2="21" y2="12"/>
+      <line x1="8" y1="18" x2="21" y2="18"/>
+      <line x1="3" y1="6" x2="3.01" y2="6"/>
+      <line x1="3" y1="12" x2="3.01" y2="12"/>
+      <line x1="3" y1="18" x2="3.01" y2="18"/>
+    </svg>
+  )
+}
+
+function IconSpin() {
+  return (
+    <span style={{
+      width: '18px',
+      height: '18px',
+      border: '2px solid rgba(255,255,255,0.35)',
+      borderTop: '2px solid white',
+      borderRadius: '50%',
+      display: 'inline-block',
+      animation: 'amo-spin 0.65s linear infinite',
+      flexShrink: 0
+    }} aria-hidden="true" />
+  )
+}
+
+// ─── Logo ────────────────────────────────────────────────────────────────────
+
+function AmoPagarLogo() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}>
+      <div style={{
+        width: '34px',
+        height: '34px',
+        borderRadius: '10px',
+        background: 'linear-gradient(135deg, #6C5DD3 0%, #00C9A7 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        boxShadow: '0 2px 8px rgba(108, 93, 211, 0.30)'
+      }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <line x1="12" y1="1" x2="12" y2="23"/>
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+      </div>
+      <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0F1824', letterSpacing: '-0.02em' }}>
+        Amo<span style={{ color: '#6C5DD3' }}>Pagar</span>
+      </span>
+    </div>
+  )
+}
+
+// ─── Page-level styles ───────────────────────────────────────────────────────
+
+const PAGE_BG = '#F4F6FA'
+
+const cardStyle: React.CSSProperties = {
+  background: 'white',
+  borderRadius: '16px',
+  border: '1px solid #E8EAF0',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06)',
+}
+
+// ─── Main Page Component ─────────────────────────────────────────────────────
+
 export default function PaginaPagamento() {
   const { id: driverIdentifier } = useParams() as { id: string }
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -128,21 +274,24 @@ export default function PaginaPagamento() {
     return (
       <main style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #F0E7FC 0%, #E8F5E9 100%)',
+        background: PAGE_BG,
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        gap: '1rem'
       }}>
+        <AmoPagarLogo />
         <div style={{
-          width: '48px',
-          height: '48px',
-          border: '4px solid rgba(139, 125, 216, 0.2)',
-          borderTop: '4px solid #8B7DD8',
+          width: '40px',
+          height: '40px',
+          border: '3px solid #E8EAF0',
+          borderTop: '3px solid #6C5DD3',
           borderRadius: '50%',
-          animation: 'spin 0.8s linear infinite'
-        }}></div>
+          animation: 'amo-spin 0.8s linear infinite'
+        }} aria-label="Carregando..." role="status" />
         <style jsx>{`
-          @keyframes spin {
+          @keyframes amo-spin {
             to { transform: rotate(360deg); }
           }
         `}</style>
@@ -155,29 +304,28 @@ export default function PaginaPagamento() {
     return (
       <main style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #F0E7FC 0%, #E8F5E9 100%)',
+        background: PAGE_BG,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '2rem'
+        padding: '2rem 1rem'
       }}>
-        <div className="amo-card" style={{ maxWidth: '480px', textAlign: 'center' }}>
-          <div style={{ width: '64px', height: '64px', background: '#FEF3C7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-            <svg width="28" height="28" fill="none" stroke="#D97706" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
-          </div>
-          <h2 style={{
-            fontSize: '1.5rem',
-            fontWeight: '700',
-            color: '#1F2933',
-            marginBottom: '1rem'
+        <div style={{ ...cardStyle, maxWidth: '440px', width: '100%', padding: '2.5rem', textAlign: 'center' }}>
+          <div style={{
+            width: '56px', height: '56px', background: '#FEF3C7',
+            borderRadius: '50%', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', margin: '0 auto 1.25rem'
           }}>
-            Erro ao carregar
+            <IconAlert size={24} color="#D97706" />
+          </div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0F1824', marginBottom: '0.5rem' }}>
+            Perfil não encontrado
           </h2>
-          <p style={{ color: '#52606D', marginBottom: '2rem' }}>
-            {error || "Não foi possível carregar o perfil."}
+          <p style={{ color: '#6B7280', fontSize: '0.9rem', lineHeight: 1.6, marginBottom: '2rem' }}>
+            {error || "Não foi possível carregar o perfil do motorista."}
           </p>
-          <Link href="/" className="amo-btn amo-btn-primary">
+          <Link href="/" className="amo-btn amo-btn-primary" style={{ width: '100%' }}>
             Voltar ao Início
           </Link>
         </div>
@@ -189,27 +337,26 @@ export default function PaginaPagamento() {
     return (
       <main style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #F0E7FC 0%, #E8F5E9 100%)',
+        background: PAGE_BG,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '2rem'
+        padding: '2rem 1rem'
       }}>
-        <div className="amo-card" style={{ maxWidth: '480px', textAlign: 'center' }}>
-          <div style={{ width: '64px', height: '64px', background: '#FEF3C7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-            <svg width="28" height="28" fill="none" stroke="#D97706" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
-          </div>
-          <h2 style={{
-            fontSize: '1.5rem',
-            fontWeight: '700',
-            color: '#1F2933',
-            marginBottom: '1rem'
+        <div style={{ ...cardStyle, maxWidth: '440px', width: '100%', padding: '2.5rem', textAlign: 'center' }}>
+          <div style={{
+            width: '56px', height: '56px', background: '#FEE2E2',
+            borderRadius: '50%', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', margin: '0 auto 1.25rem'
           }}>
+            <IconAlert size={24} color="#DC2626" />
+          </div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#0F1824', marginBottom: '0.5rem' }}>
             Erro no pagamento
           </h2>
-          <p style={{ color: '#52606D', marginBottom: '2rem' }}>{error}</p>
-          <Link href="/" className="amo-btn amo-btn-primary">
+          <p style={{ color: '#6B7280', fontSize: '0.9rem', lineHeight: 1.6, marginBottom: '2rem' }}>{error}</p>
+          <Link href="/" className="amo-btn amo-btn-primary" style={{ width: '100%' }}>
             Voltar ao Início
           </Link>
         </div>
@@ -244,44 +391,46 @@ export default function PaginaPagamento() {
   return (
     <main style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #F0E7FC 0%, #E8F5E9 100%)',
-      padding: '2rem 1rem'
+      background: PAGE_BG,
+      padding: '2rem 1rem 3rem'
     }}>
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-        {/* AmoPagar Logo */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+      <style jsx>{`
+        @keyframes amo-spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+
+      <div style={{ maxWidth: '540px', margin: '0 auto' }}>
+
+        {/* Logo */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2rem' }}>
           <Link href="/" style={{ textDecoration: 'none' }}>
-            <h1 style={{
-              fontSize: '2rem',
-              fontWeight: '800'
-            }}>
-              <span style={{ color: '#8B7DD8' }}>Amo</span>
-              <span style={{ color: '#81C995' }}>Pagar</span>
-            </h1>
+            <AmoPagarLogo />
           </Link>
         </div>
 
         {/* Driver Info Card */}
-        <div className="amo-card amo-fade-in" style={{ marginBottom: '1.5rem' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem',
-            marginBottom: '1rem'
-          }}>
+        <div className="amo-fade-in" style={{ ...cardStyle, marginBottom: '1rem', padding: '1.5rem' }}>
+          <p style={{ fontSize: '0.75rem', fontWeight: '600', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '1rem' }}>
+            Pagando para
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            {/* Avatar */}
             <div style={{
-              width: '64px',
-              height: '64px',
+              width: '56px',
+              height: '56px',
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #8B7DD8 0%, #81C995 100%)',
+              background: 'linear-gradient(135deg, #6C5DD3 0%, #00C9A7 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '2rem',
+              fontSize: '1.5rem',
               color: 'white',
-              fontWeight: '800',
+              fontWeight: '700',
               flexShrink: 0,
-              overflow: 'hidden'
+              overflow: 'hidden',
+              border: '2px solid white',
+              boxShadow: '0 0 0 2px #E8EAF0'
             }}>
               {profile.avatar_url ? (
                 <div
@@ -295,45 +444,80 @@ export default function PaginaPagamento() {
                   }}
                 />
               ) : (
-                profile.nome?.charAt(0).toUpperCase() || '💳'
+                profile.nome?.charAt(0).toUpperCase() || 'M'
               )}
             </div>
-            <div style={{ flex: 1 }}>
-              <p style={{
-                fontSize: '0.875rem',
-                color: '#52606D',
-                marginBottom: '0.25rem'
-              }}>
-                Pagando para
-              </p>
-              <h2 style={{
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                color: '#1F2933',
-                marginBottom: '0.25rem'
-              }}>
-                {profile.nome || "Motorista"}
-              </h2>
+
+            {/* Info */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <h2 style={{ fontSize: '1.125rem', fontWeight: '700', color: '#0F1824', margin: 0 }}>
+                  {profile.nome || "Motorista"}
+                </h2>
+                {/* Verified badge */}
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '3px',
+                  background: '#EEF2FF', color: '#4F46E5',
+                  fontSize: '0.7rem', fontWeight: '600', padding: '2px 7px',
+                  borderRadius: '99px', letterSpacing: '0.02em'
+                }}>
+                  <IconCheck size={10} color="#4F46E5" />
+                  Verificado
+                </span>
+              </div>
               {profile.company_name && (
-                <p style={{ fontSize: '0.875rem', color: '#52606D', marginBottom: '0.25rem' }}>
+                <p style={{ fontSize: '0.875rem', color: '#6B7280', margin: '0.15rem 0 0' }}>
                   {profile.company_name}
                 </p>
               )}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', fontSize: '0.875rem', color: '#9AA5B1' }}>
-                {profile.celular && (
-                  <span>{formatDisplayPhoneNumber(profile.celular)}</span>
-                )}
-              </div>
+              {profile.celular && (
+                <p style={{ fontSize: '0.8rem', color: '#9CA3AF', margin: '0.25rem 0 0', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <IconPhone size={12} color="#9CA3AF" />
+                  {formatDisplayPhoneNumber(profile.celular)}
+                </p>
+              )}
             </div>
           </div>
         </div>
 
         {/* Payment Form Card */}
-        <div className="amo-card amo-fade-in">
+        <div
+          className="amo-fade-in"
+          style={{
+            ...cardStyle,
+            borderTop: '3px solid #6C5DD3',
+            borderRadius: '0 0 16px 16px',
+            padding: '2rem',
+          }}
+        >
           <Elements stripe={stripePromise} options={options}>
             {paymentForm}
           </Elements>
         </div>
+
+        {/* Trust footer */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '1.5rem',
+          marginTop: '1.5rem',
+          flexWrap: 'wrap'
+        }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: '#9CA3AF' }}>
+            <IconShield size={13} color="#9CA3AF" />
+            Pagamento seguro
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: '#9CA3AF' }}>
+            <IconShield size={13} color="#9CA3AF" />
+            Banco Central do Brasil
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: '#9CA3AF' }}>
+            <IconShield size={13} color="#9CA3AF" />
+            Stripe
+          </span>
+        </div>
+
       </div>
     </main>
   )
@@ -586,55 +770,58 @@ function CheckoutForm({
     }
   }
 
-  // If showing Pix code, render the Pix payment screen
+  // ─── Pix QR Code screen ────────────────────────────────────────────────────
   if (showPixCode && pixPayload) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        <div style={{ textAlign: 'center' }}>
-          <h3 style={{
-            fontSize: '1.25rem',
-            fontWeight: '700',
-            color: '#1F2933',
-            marginBottom: '0.5rem'
-          }}>
-            📱 Pague com Pix
-          </h3>
-          <p style={{
-            fontSize: '1.5rem',
-            fontWeight: '700',
-            color: '#81C995'
-          }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+        {/* Header */}
+        <div style={{ textAlign: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #F0F2F5' }}>
+          <p style={{ fontSize: '0.75rem', fontWeight: '600', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>
+            Pague com Pix
+          </p>
+          <p style={{ fontSize: '2rem', fontWeight: '700', color: '#0F1824', letterSpacing: '-0.03em', margin: 0 }}>
             {formatAmount(amount)}
+          </p>
+          <p style={{ fontSize: '0.8rem', color: '#9CA3AF', marginTop: '0.25rem' }}>
+            para {profile.nome || 'Motorista'}
           </p>
         </div>
 
         {/* QR Code */}
         {pixQrCode && (
           <div style={{
-            background: 'white',
-            borderRadius: 'var(--amo-radius-md)',
+            background: '#FAFBFC',
+            borderRadius: '12px',
             padding: '1.5rem',
             textAlign: 'center',
-            border: '2px solid #E4E7EB'
+            border: '1px solid #E8EAF0'
           }}>
             <Image
               src={pixQrCode}
               alt="QR Code Pix"
-              width={320}
-              height={320}
+              width={260}
+              height={260}
               unoptimized
               style={{
                 maxWidth: '100%',
                 height: 'auto',
-                borderRadius: 'var(--amo-radius-sm)'
+                borderRadius: '8px',
+                display: 'block',
+                margin: '0 auto'
               }}
             />
             <p style={{
-              fontSize: '0.875rem',
-              color: '#52606D',
-              marginTop: '1rem'
+              fontSize: '0.8rem',
+              color: '#9CA3AF',
+              marginTop: '0.875rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.35rem'
             }}>
-              Escaneie o QR Code com seu app do banco
+              <IconPhone size={13} color="#9CA3AF" />
+              Escaneie com o app do seu banco
             </p>
           </div>
         )}
@@ -643,67 +830,93 @@ function CheckoutForm({
         <div>
           <label style={{
             display: 'block',
-            fontSize: '0.875rem',
+            fontSize: '0.75rem',
             fontWeight: '600',
-            color: '#1F2933',
+            color: '#6B7280',
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
             marginBottom: '0.5rem'
           }}>
-            Ou copie o código Pix:
+            Ou copie o código Pix
           </label>
           <div style={{
-            background: '#F9FAFB',
-            borderRadius: 'var(--amo-radius-md)',
-            padding: '1rem',
-            border: '2px solid #E4E7EB',
+            background: '#F8F9FB',
+            borderRadius: '10px',
+            padding: '0.875rem 1rem',
+            border: '1px solid #E8EAF0',
             wordBreak: 'break-all',
             fontSize: '0.75rem',
-            fontFamily: 'monospace',
-            color: '#52606D',
-            maxHeight: '100px',
-            overflow: 'auto'
+            fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
+            color: '#4B5563',
+            maxHeight: '96px',
+            overflow: 'auto',
+            lineHeight: 1.7
           }}>
             {pixPayload}
           </div>
         </div>
 
-        {/* Payment Instructions */}
+        {/* How to pay */}
         <div style={{
-          background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
-          borderRadius: 'var(--amo-radius-md)',
-          padding: '1.5rem',
-          border: '2px solid #93C5FD'
+          background: '#F5F7FF',
+          borderRadius: '10px',
+          padding: '1.125rem 1.25rem',
+          border: '1px solid #E0E4F5'
         }}>
-          <h4 style={{
-            fontSize: '1rem',
-            fontWeight: '700',
-            color: '#1E40AF',
-            marginBottom: '0.75rem'
+          <p style={{
+            fontSize: '0.8rem',
+            fontWeight: '600',
+            color: '#3730A3',
+            marginBottom: '0.625rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem'
           }}>
-            📝 Como pagar:
-          </h4>
+            <IconList size={14} color="#3730A3" />
+            Como pagar:
+          </p>
           <ol style={{
-            fontSize: '0.875rem',
-            color: '#1E40AF',
-            paddingLeft: '1.25rem',
+            fontSize: '0.8rem',
+            color: '#4338CA',
+            paddingLeft: '1.125rem',
             margin: 0,
-            lineHeight: '1.6'
+            lineHeight: '1.75'
           }}>
             <li>Abra o app do seu banco</li>
             <li>Escaneie o QR Code ou copie o código</li>
             <li>Confirme o pagamento de {formatAmount(amount)}</li>
-            <li>Guarde o comprovante após concluir o Pix</li>
+            <li>Guarde o comprovante após concluir</li>
           </ol>
         </div>
 
+        {/* Copy button */}
         <button
           type="button"
           onClick={handleCopyPix}
-          className="amo-btn amo-btn-secondary"
-          style={{ width: '100%' }}
+          style={{
+            width: '100%',
+            padding: '0.875rem',
+            borderRadius: '10px',
+            border: '1.5px solid #6C5DD3',
+            background: 'white',
+            color: '#6C5DD3',
+            fontWeight: '600',
+            fontSize: '0.925rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            transition: 'background 0.18s ease, color 0.18s ease'
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = '#6C5DD3'; (e.currentTarget as HTMLButtonElement).style.color = 'white' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'white'; (e.currentTarget as HTMLButtonElement).style.color = '#6C5DD3' }}
         >
-          📋 Copiar Código Pix
+          <IconCopy size={16} />
+          Copiar código Pix
         </button>
 
+        {/* Back button */}
         <button
           type="button"
           onClick={() => {
@@ -711,39 +924,68 @@ function CheckoutForm({
             setPixPayload(null)
             setPixQrCode(null)
           }}
-          className="amo-btn amo-btn-outline"
-          style={{ width: '100%' }}
+          style={{
+            width: '100%',
+            padding: '0.75rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: 'transparent',
+            color: '#9CA3AF',
+            fontWeight: '500',
+            fontSize: '0.875rem',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.4rem',
+            transition: 'color 0.15s ease'
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#4B5563' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#9CA3AF' }}
         >
-          ← Voltar
+          <IconArrowLeft size={15} />
+          Voltar
         </button>
 
-        {/* Security Badge */}
+        {/* Security badge */}
         <div style={{
           textAlign: 'center',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '0.5rem',
-          color: '#9AA5B1',
-          fontSize: '0.875rem'
+          gap: '0.4rem',
+          color: '#9CA3AF',
+          fontSize: '0.75rem'
         }}>
-          <span>🔒</span>
-          <span>Pagamento seguro via Pix</span>
+          <IconShield size={13} color="#9CA3AF" />
+          <span>Pagamento seguro via Pix · Banco Central do Brasil</span>
         </div>
       </div>
     )
   }
 
+  // ─── Main checkout form ────────────────────────────────────────────────────
+  const isDisabled = (
+    submitting ||
+    !!amountError ||
+    !amount ||
+    parseInt(amount, 10) <= 0 ||
+    (paymentMethod === 'card' && (!stripe || !elements))
+  )
+
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
       {/* Amount Input */}
       <div>
         <label htmlFor="amount" style={{
           display: 'block',
-          fontSize: '0.875rem',
+          fontSize: '0.75rem',
           fontWeight: '600',
-          color: '#1F2933',
-          marginBottom: '0.5rem',
+          color: '#9CA3AF',
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+          marginBottom: '0.625rem',
           textAlign: 'center'
         }}>
           Valor do Pagamento
@@ -757,30 +999,39 @@ function CheckoutForm({
           placeholder="R$ 0,00"
           className="amo-input"
           style={{
-            fontSize: '2rem',
+            fontSize: '2.25rem',
             fontWeight: '700',
             textAlign: 'center',
-            color: '#1F2933',
-            border: amountError ? '2px solid #FCA5A5' : '2px solid #E4E7EB'
+            color: '#0F1824',
+            letterSpacing: '-0.02em',
+            border: amountError ? '2px solid #FCA5A5' : '2px solid #E8EAF0',
+            background: amountError ? '#FFF5F5' : '#FAFBFC',
+            padding: '1rem',
+            borderRadius: '12px'
           }}
           autoFocus
         />
         {amountError && (
           <p style={{
             textAlign: 'center',
-            fontSize: '0.875rem',
+            fontSize: '0.8rem',
             color: '#DC2626',
-            marginTop: '0.5rem'
+            marginTop: '0.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.35rem'
           }}>
-            ⚠️ {amountError}
+            <IconAlert size={14} color="#DC2626" />
+            {amountError}
           </p>
         )}
         {paymentMethod === 'card' && (
           <p style={{
             textAlign: 'center',
             fontSize: '0.75rem',
-            color: '#9AA5B1',
-            marginTop: '0.25rem'
+            color: '#9CA3AF',
+            marginTop: '0.375rem'
           }}>
             Mínimo R$ 2,00 · Máximo R$ 400,00
           </p>
@@ -792,69 +1043,71 @@ function CheckoutForm({
         <div>
           <label style={{
             display: 'block',
-            fontSize: '0.875rem',
+            fontSize: '0.75rem',
             fontWeight: '600',
-            color: '#1F2933',
-            marginBottom: '0.75rem',
+            color: '#9CA3AF',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            marginBottom: '0.625rem',
             textAlign: 'center'
           }}>
             Forma de Pagamento
           </label>
           <div style={{
             display: 'flex',
-            gap: '0.5rem',
-            background: '#F9FAFB',
-            padding: '0.25rem',
-            borderRadius: 'var(--amo-radius-md)',
-            border: '2px solid #E4E7EB'
+            gap: '0',
+            background: '#F4F6FA',
+            padding: '4px',
+            borderRadius: '12px',
+            border: '1px solid #E8EAF0'
           }}>
             <button
               type="button"
               onClick={() => setPaymentMethod('pix')}
               style={{
                 flex: 1,
-                padding: '0.75rem',
-                borderRadius: 'var(--amo-radius-sm)',
+                padding: '0.625rem',
+                borderRadius: '9px',
                 border: 'none',
-                background: paymentMethod === 'pix'
-                  ? 'linear-gradient(135deg, #81C995 0%, #6EE7B7 100%)'
-                  : 'transparent',
-                color: paymentMethod === 'pix' ? 'white' : '#52606D',
-                fontWeight: '600',
+                background: paymentMethod === 'pix' ? 'white' : 'transparent',
+                color: paymentMethod === 'pix' ? '#0F1824' : '#9CA3AF',
+                fontWeight: paymentMethod === 'pix' ? '600' : '500',
                 fontSize: '0.875rem',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease',
+                transition: 'all 0.18s ease',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '0.5rem'
+                gap: '0.4rem',
+                boxShadow: paymentMethod === 'pix' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
               }}
             >
-              📱 Pix
+              <IconPhone size={15} color={paymentMethod === 'pix' ? '#00C9A7' : '#9CA3AF'} />
+              Pix
             </button>
             <button
               type="button"
               onClick={() => setPaymentMethod('card')}
               style={{
                 flex: 1,
-                padding: '0.75rem',
-                borderRadius: 'var(--amo-radius-sm)',
+                padding: '0.625rem',
+                borderRadius: '9px',
                 border: 'none',
-                background: paymentMethod === 'card'
-                  ? 'linear-gradient(135deg, #8B7DD8 0%, #A78BFA 100%)'
-                  : 'transparent',
-                color: paymentMethod === 'card' ? 'white' : '#52606D',
-                fontWeight: '600',
+                background: paymentMethod === 'card' ? 'white' : 'transparent',
+                color: paymentMethod === 'card' ? '#0F1824' : '#9CA3AF',
+                fontWeight: paymentMethod === 'card' ? '600' : '500',
                 fontSize: '0.875rem',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease',
+                transition: 'all 0.18s ease',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '0.5rem'
+                gap: '0.4rem',
+                boxShadow: paymentMethod === 'card' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none'
               }}
             >
-              💳 Cartão
+              <IconCreditCard size={15} color={paymentMethod === 'card' ? '#6C5DD3' : '#9CA3AF'} />
+              Cartão
             </button>
           </div>
         </div>
@@ -865,23 +1118,23 @@ function CheckoutForm({
         <div>
           {status !== 'authenticated' && (
             <div style={{
-              background: 'linear-gradient(135deg, #EFF6FF 0%, #F5F3FF 100%)',
-              borderRadius: 'var(--amo-radius-md)',
-              padding: '1rem',
-              border: '2px solid #C4B5FD',
+              background: '#F5F7FF',
+              borderRadius: '10px',
+              padding: '1rem 1.125rem',
+              border: '1px solid #E0E4F5',
               marginBottom: '0.75rem'
             }}>
-              <p style={{ fontSize: '0.9rem', fontWeight: '700', color: '#312E81', marginBottom: '0.35rem' }}>
+              <p style={{ fontSize: '0.875rem', fontWeight: '600', color: '#3730A3', marginBottom: '0.25rem' }}>
                 Entre para pagar mais rápido
               </p>
-              <p style={{ fontSize: '0.8rem', color: '#4338CA', marginBottom: '0.75rem' }}>
+              <p style={{ fontSize: '0.8rem', color: '#4338CA', marginBottom: '0.75rem', lineHeight: 1.5 }}>
                 Voltamos você para esta cobrança e seus cartões ficam salvos com mais facilidade.
               </p>
-              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <Link href={loginHref} className="amo-btn amo-btn-outline" style={{ flex: 1, minWidth: '150px', textAlign: 'center' }}>
+              <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap' }}>
+                <Link href={loginHref} className="amo-btn amo-btn-outline" style={{ flex: 1, minWidth: '140px', textAlign: 'center', fontSize: '0.8rem', padding: '0.5rem 1rem' }}>
                   Entrar
                 </Link>
-                <Link href={signupHref} className="amo-btn amo-btn-secondary" style={{ flex: 1, minWidth: '150px', textAlign: 'center' }}>
+                <Link href={signupHref} className="amo-btn amo-btn-primary" style={{ flex: 1, minWidth: '140px', textAlign: 'center', fontSize: '0.8rem', padding: '0.5rem 1rem' }}>
                   Criar conta
                 </Link>
               </div>
@@ -890,23 +1143,23 @@ function CheckoutForm({
 
           {status === 'authenticated' && (
             <div style={{
-              background: '#F9FAFB',
-              borderRadius: 'var(--amo-radius-md)',
-              padding: '1rem',
-              border: '2px solid #E5E7EB',
+              background: '#F8F9FB',
+              borderRadius: '10px',
+              padding: '1rem 1.125rem',
+              border: '1px solid #E8EAF0',
               marginBottom: '0.75rem'
             }}>
-              <p style={{ fontSize: '0.9rem', fontWeight: '700', color: '#111827', marginBottom: '0.35rem' }}>
+              <p style={{ fontSize: '0.875rem', fontWeight: '600', color: '#0F1824', marginBottom: '0.25rem' }}>
                 Conta conectada
               </p>
-              <p style={{ fontSize: '0.8rem', color: '#4B5563', marginBottom: '0.75rem' }}>
+              <p style={{ fontSize: '0.8rem', color: '#6B7280', marginBottom: '0.75rem', lineHeight: 1.5 }}>
                 Use sua carteira para salvar e revisar cartões sempre com o mesmo login.
               </p>
-              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <Link href="/cliente/payment-methods" className="amo-btn amo-btn-outline" style={{ flex: 1, minWidth: '150px', textAlign: 'center' }}>
+              <div style={{ display: 'flex', gap: '0.625rem', flexWrap: 'wrap' }}>
+                <Link href="/cliente/payment-methods" className="amo-btn amo-btn-outline" style={{ flex: 1, minWidth: '140px', textAlign: 'center', fontSize: '0.8rem', padding: '0.5rem 1rem' }}>
                   Meus cartões
                 </Link>
-                <Link href="/cliente/dashboard/historico" className="amo-btn amo-btn-outline" style={{ flex: 1, minWidth: '150px', textAlign: 'center' }}>
+                <Link href="/cliente/dashboard/historico" className="amo-btn amo-btn-outline" style={{ flex: 1, minWidth: '140px', textAlign: 'center', fontSize: '0.8rem', padding: '0.5rem 1rem' }}>
                   Histórico
                 </Link>
               </div>
@@ -915,45 +1168,57 @@ function CheckoutForm({
 
           <label style={{
             display: 'block',
-            fontSize: '0.875rem',
+            fontSize: '0.75rem',
             fontWeight: '600',
-            color: '#1F2933',
-            marginBottom: '0.75rem'
+            color: '#9CA3AF',
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            marginBottom: '0.625rem'
           }}>
             {hasPixKey && hasStripe ? 'Cartão, Apple Pay ou Google Pay' : 'Forma de Pagamento'}
           </label>
+
           <div style={{
-            background: '#F5F3FF',
-            borderRadius: 'var(--amo-radius-md)',
-            padding: '1rem',
-            border: '2px solid #DDD6FE',
+            background: '#F5F7FF',
+            borderRadius: '10px',
+            padding: '0.875rem 1rem',
+            border: '1px solid #E0E4F5',
             marginBottom: '0.75rem',
             display: 'flex',
             alignItems: 'center',
             gap: '0.75rem'
           }}>
-            <span style={{ fontSize: '1.5rem' }}>🔒</span>
+            <div style={{
+              width: '36px', height: '36px', background: '#6C5DD3',
+              borderRadius: '8px', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', flexShrink: 0
+            }}>
+              <IconShield size={16} color="white" />
+            </div>
             <div>
-              <p style={{ fontSize: '0.875rem', color: '#5B21B6', fontWeight: '600', marginBottom: '0.15rem' }}>
+              <p style={{ fontSize: '0.875rem', color: '#3730A3', fontWeight: '600', margin: 0 }}>
                 Pagamento seguro via Stripe
               </p>
-              <p style={{ fontSize: '0.75rem', color: '#7C3AED' }}>
+              <p style={{ fontSize: '0.75rem', color: '#6366F1', margin: '0.1rem 0 0' }}>
                 Apple Pay, Google Pay ou cartão de crédito/débito
               </p>
             </div>
           </div>
+
           <div style={{
             background: '#FFFFFF',
-            borderRadius: 'var(--amo-radius-md)',
+            borderRadius: '10px',
             padding: '1rem',
-            border: '2px solid #E5E7EB',
+            border: '1px solid #E8EAF0',
             marginBottom: '0.75rem'
           }}>
             <p style={{
-              fontSize: '0.875rem',
+              fontSize: '0.75rem',
               fontWeight: '600',
-              color: '#1F2933',
-              marginBottom: '0.5rem'
+              color: '#6B7280',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              marginBottom: '0.625rem'
             }}>
               Pague com um toque
             </p>
@@ -983,8 +1248,8 @@ function CheckoutForm({
             />
             <p style={{
               fontSize: '0.75rem',
-              color: walletsChecked && walletsAvailable ? '#047857' : '#6B7280',
-              marginTop: '0.75rem'
+              color: walletsChecked && walletsAvailable ? '#059669' : '#9CA3AF',
+              marginTop: '0.625rem'
             }}>
               {walletsChecked && walletsAvailable
                 ? 'Apple Pay e Google Pay estão prontos neste dispositivo.'
@@ -995,37 +1260,39 @@ function CheckoutForm({
         </div>
       ) : (
         <div style={{
-          background: 'linear-gradient(135deg, #D1FAE5 0%, #E8F5E9 100%)',
-          borderRadius: 'var(--amo-radius-md)',
-          padding: '1.5rem',
-          border: '2px solid #6EE7B7'
+          background: '#F0FDF9',
+          borderRadius: '10px',
+          padding: '1.125rem 1.25rem',
+          border: '1px solid #A7F3D0'
         }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: '0.75rem',
-            marginBottom: '0.75rem'
+            marginBottom: '0.625rem'
           }}>
-            <span style={{ fontSize: '2rem' }}>📱</span>
+            <div style={{
+              width: '36px', height: '36px', background: '#00C9A7',
+              borderRadius: '8px', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', flexShrink: 0
+            }}>
+              <IconPhone size={18} color="white" />
+            </div>
             <div>
-              <h4 style={{
-                fontSize: '1rem',
-                fontWeight: '700',
-                color: '#065F46',
-                marginBottom: '0.25rem'
-              }}>
+              <h4 style={{ fontSize: '0.9rem', fontWeight: '700', color: '#065F46', margin: 0 }}>
                 Pagamento via Pix
               </h4>
-              <p style={{ fontSize: '0.875rem', color: '#059669' }}>
+              <p style={{ fontSize: '0.8rem', color: '#059669', margin: '0.1rem 0 0' }}>
                 Rápido, seguro e sem taxas
               </p>
             </div>
           </div>
           <ul style={{
-            fontSize: '0.875rem',
+            fontSize: '0.8rem',
             color: '#047857',
-            paddingLeft: '1.25rem',
-            margin: 0
+            paddingLeft: '1.125rem',
+            margin: 0,
+            lineHeight: '1.75'
           }}>
             <li>Dinheiro cai na hora</li>
             <li>Disponível 24/7</li>
@@ -1037,17 +1304,18 @@ function CheckoutForm({
       {/* Error Message */}
       {error && (
         <div style={{
-          background: '#FEE2E2',
-          border: '2px solid #FCA5A5',
-          borderRadius: 'var(--amo-radius-md)',
-          padding: '1rem',
+          background: '#FEF2F2',
+          border: '1px solid #FECACA',
+          borderLeft: '3px solid #DC2626',
+          borderRadius: '10px',
+          padding: '0.875rem 1rem',
           color: '#991B1B',
           fontSize: '0.875rem',
           display: 'flex',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           gap: '0.5rem'
         }}>
-          <span>⚠️</span>
+          <IconAlert size={16} color="#DC2626" />
           <span>{error}</span>
         </div>
       )}
@@ -1055,42 +1323,62 @@ function CheckoutForm({
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={
-          submitting ||
-          !!amountError ||
-          !amount ||
-          parseInt(amount, 10) <= 0 ||
-          (paymentMethod === 'card' && (!stripe || !elements))
-        }
-        className={paymentMethod === 'pix' ? 'amo-btn amo-btn-secondary' : 'amo-btn amo-btn-primary'}
+        disabled={isDisabled}
         style={{
           width: '100%',
-          fontSize: '1.125rem',
           padding: '1rem',
-          opacity: (
-            submitting ||
-            !!amountError ||
-            !amount ||
-            parseInt(amount, 10) <= 0 ||
-            (paymentMethod === 'card' && (!stripe || !elements))
-          ) ? 0.5 : 1
+          borderRadius: '12px',
+          border: 'none',
+          background: isDisabled
+            ? '#E8EAF0'
+            : paymentMethod === 'pix'
+              ? '#00C9A7'
+              : '#6C5DD3',
+          color: isDisabled ? '#9CA3AF' : 'white',
+          fontWeight: '700',
+          fontSize: '1rem',
+          cursor: isDisabled ? 'not-allowed' : 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.5rem',
+          transition: 'background 0.18s ease, transform 0.15s ease, box-shadow 0.18s ease',
+          boxShadow: isDisabled
+            ? 'none'
+            : paymentMethod === 'pix'
+              ? '0 4px 14px rgba(0, 201, 167, 0.35)'
+              : '0 4px 14px rgba(108, 93, 211, 0.35)',
+          letterSpacing: '-0.01em'
+        }}
+        onMouseEnter={e => {
+          if (!isDisabled) {
+            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'
+            ;(e.currentTarget as HTMLButtonElement).style.boxShadow = paymentMethod === 'pix'
+              ? '0 6px 20px rgba(0, 201, 167, 0.40)'
+              : '0 6px 20px rgba(108, 93, 211, 0.40)'
+          }
+        }}
+        onMouseLeave={e => {
+          if (!isDisabled) {
+            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)'
+            ;(e.currentTarget as HTMLButtonElement).style.boxShadow = paymentMethod === 'pix'
+              ? '0 4px 14px rgba(0, 201, 167, 0.35)'
+              : '0 4px 14px rgba(108, 93, 211, 0.35)'
+          }
         }}
       >
         {submitting ? (
-          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-            <span style={{
-              width: '16px',
-              height: '16px',
-              border: '2px solid rgba(255,255,255,0.3)',
-              borderTop: '2px solid white',
-              borderRadius: '50%',
-              animation: 'spin 0.6s linear infinite'
-            }}></span>
+          <>
+            <IconSpin />
             Processando...
-          </span>
+          </>
         ) : (
           <>
-            {paymentMethod === 'pix' ? '📱 Gerar Pix' : '💳 Pagar'} {amount ? formatAmount(amount) : ""}
+            {paymentMethod === 'pix'
+              ? <><IconQrCode size={18} /> Gerar Pix</>
+              : <><IconCreditCard size={18} /> Pagar</>
+            }
+            {amount ? ` · ${formatAmount(amount)}` : ""}
           </>
         )}
       </button>
@@ -1101,23 +1389,18 @@ function CheckoutForm({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '0.5rem',
-        color: '#9AA5B1',
-        fontSize: '0.875rem'
+        gap: '0.4rem',
+        color: '#9CA3AF',
+        fontSize: '0.75rem'
       }}>
-        <span>🔒</span>
+        <IconShield size={13} color="#9CA3AF" />
         <span>
           {paymentMethod === 'pix'
-            ? 'Pagamento seguro via Pix'
-            : 'Pagamento seguro via Stripe'}
+            ? 'Pagamento seguro · Pix pelo Banco Central'
+            : 'Pagamento criptografado · Stripe'}
         </span>
       </div>
 
-      <style jsx>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </form>
   )
 }
