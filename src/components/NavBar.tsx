@@ -17,6 +17,11 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { useMotoristaProfile } from "@/hooks/useMotoristaProfile";
+import {
+  buildPathWithSearch,
+  sanitizeInternalCallbackUrl,
+} from "@/lib/utils/navigation";
+import Logo from "./Logo";
 
 // Define a type for the user object within the session for better type safety
 interface UserSession {
@@ -52,8 +57,11 @@ export default function NavBar() {
   const profileDropdownRef = useRef<HTMLDivElement>(null);
 
   const userType = session?.user?.tipo;
-  const user = session?.user || null; // Get user object from session
-  // console.log("Session info in NavBar:", user);
+  const canUseDriverView = Boolean(profile?.can_use_driver_view || userType === "motorista");
+  const prefersDriverView = Boolean(profile?.tipo === "motorista" || userType === "motorista");
+  const currentPathWithSearch = buildPathWithSearch(pathname, searchParams);
+  const isPublicPaymentPage =
+    pathname.startsWith("/pagamento/") || /^\/\+?[0-9]{10,}$/.test(pathname);
 
   const isLoading = status === "loading";
   const isAuthenticated = status === "authenticated";
@@ -94,51 +102,34 @@ export default function NavBar() {
     // Regex to specifically match /[phoneNumber] (assuming it's numeric) and not other root paths
 
     const isClientAuthPage = ["/login", "/cadastro"].includes(pathname);
-    const isDriverAuthPage = [
-      "/motorista/login",
-      "/motorista/cadastro",
-    ].includes(pathname);
+    const isDriverAuthPage = pathname === "/motorista/login";
+    const defaultAuthenticatedPath =
+      canUseDriverView && prefersDriverView
+        ? "/motorista/dashboard/overview"
+        : "/cliente/dashboard";
+    const authPageTarget = sanitizeInternalCallbackUrl(
+      searchParams.get("callbackUrl"),
+      "/auth/post-login"
+    );
 
     if (isAuthenticated) {
-      if (userType === "cliente" && isClientAuthPage) {
-        router.replace("/cliente/dashboard");
-        return;
-      }
-      if (userType === "motorista" && isDriverAuthPage) {
-        router.replace("/motorista/dashboard/overview");
+      if (isClientAuthPage || isDriverAuthPage) {
+        router.replace(authPageTarget);
         return;
       }
       if (pathname === "/") {
-        if (userType === "cliente") router.replace("/cliente/dashboard");
-        if (userType === "motorista")
-          router.replace("/motorista/dashboard/overview");
+        router.replace(defaultAuthenticatedPath);
         return;
       }
-      if (userType === "cliente" && pathname.startsWith("/motorista/")) {
+      if (!canUseDriverView && pathname.startsWith("/motorista/")) {
         router.replace("/cliente/dashboard");
-        return;
-      }
-      // Allow driver to be on their own public page
-      const driverPublicPagePath = session?.user?.celular
-        ? `/${session.user.celular.replace(/\D/g, "")}`
-        : null;
-      if (
-        userType === "motorista" &&
-        (pathname.startsWith("/cliente/") ||
-          pathname.startsWith("/dashboard") ||
-          pathname.startsWith("/payment-methods")) &&
-        pathname !== driverPublicPagePath
-      ) {
-        router.replace("/motorista/dashboard/overview");
         return;
       }
     }
 
     if (status === "unauthenticated") {
       // Only redirect if definitively unauthenticated
-      const callbackUrlParam = `?callbackUrl=${encodeURIComponent(
-        pathname + searchParams.toString()
-      )}`;
+      const callbackUrlParam = `?callbackUrl=${encodeURIComponent(currentPathWithSearch)}`;
       if (
         pathname.startsWith("/cliente/") ||
         pathname.startsWith("/dashboard") ||
@@ -148,19 +139,21 @@ export default function NavBar() {
         return;
       }
       if (pathname.startsWith("/motorista/") && !isDriverAuthPage) {
-        router.replace(`/motorista/login${callbackUrlParam}`);
+        router.replace(`/login?callbackUrl=${encodeURIComponent(currentPathWithSearch)}`);
         return;
       }
     }
   }, [
     status,
     userType,
+    canUseDriverView,
+    prefersDriverView,
     pathname,
     router,
     searchParams,
+    currentPathWithSearch,
     isAuthenticated,
     isLoading,
-    session?.user?.celular,
   ]);
 
   // --- Sign-out Handler ---
@@ -173,30 +166,30 @@ export default function NavBar() {
   // --- Determine Logo Link ---
   let logoHref = "/";
   if (isAuthenticated) {
-    if (userType === "motorista") logoHref = "/motorista/dashboard/overview";
-    else if (userType === "cliente") logoHref = "/cliente/dashboard";
+    if (canUseDriverView && prefersDriverView) logoHref = "/motorista/dashboard/overview";
+    else logoHref = "/cliente/dashboard";
   }
 
   // --- Profile Menu Items ---
   const getProfileMenuItems = () => {
     // if (!isAuthenticated) return [];
 
-    if (userType === "cliente") {
+    if (!canUseDriverView) {
       return [
         {
-          href: "/cliente/dashboard/dados",
-          text: "Minha Conta",
-          icon: <User className="w-4 h-4 mr-2" />,
-        },
-        {
           href: "/cliente/dashboard/historico",
-          text: "Historico de Pagamentos",
+          text: "Histórico",
           icon: <History className="w-4 h-4 mr-2" />,
         },
         {
           href: "/cliente/payment-methods",
-          text: "Carteira",
+          text: "Meus Cartões",
           icon: <CreditCard className="w-4 h-4 mr-2" />,
+        },
+        {
+          href: "/settings",
+          text: "Configurações",
+          icon: <Settings className="w-4 h-4 mr-2" />,
         },
         {
           onClick: handleSignOut,
@@ -204,37 +197,23 @@ export default function NavBar() {
           icon: <LogOut className="w-4 h-4 mr-2" />,
         },
       ];
-    } else if (userType === "motorista") {
-      const driverPublicPageLink = profile?.celular
-        ? `https://amopagar.vercel.app/${profile?.celular.replace(
-            /\D/g,
-            ""
-          )}`
-        : null;
-         
-   
+    } else if (canUseDriverView) {
+      const isStripeConnected = profile?.stripe_ready;
 
-      const isStripeConnected = profile?.stripe_account_id;
-          
       return [
         {
-          href: "/motorista/dashboard/dados",
-          text: "Minha Conta",
-          icon: <User className="w-4 h-4 mr-2" />,
-        },
-        {
-          href: "/motorista/dashboard/overview",
-          text: "Dashboard",
-          icon: <Settings className="w-4 h-4 mr-2" />,
-        },
-        {
-          href: "/motorista/dashboard/pagamentos",
-          text: "Pagamentos",
+          href: "/cliente/dashboard",
+          text: "Área do Cliente",
           icon: <CreditCard className="w-4 h-4 mr-2" />,
         },
         {
+          href: "/motorista/dashboard/pagamentos",
+          text: "Histórico",
+          icon: <History className="w-4 h-4 mr-2" />,
+        },
+        {
           href: "/motorista/lucro",
-          text: "Lucro",
+          text: "Analytics",
           icon: <CreditCard className="w-4 h-4 mr-2" />,
         },
         {
@@ -242,9 +221,14 @@ export default function NavBar() {
             ? "/motorista/dashboard/pagina-pagamento"
             : "/motorista/stripe-onboarding",
           text: isStripeConnected
-            ? "Minha Página de Pagamento"
+            ? "Página de Pagamento"
             : "Conectar Stripe",
           icon: <ExternalLink className="w-4 h-4 mr-2" />,
+        },
+        {
+          href: "/settings",
+          text: "Configurações",
+          icon: <Settings className="w-4 h-4 mr-2" />,
         },
         {
           onClick: handleSignOut,
@@ -259,28 +243,30 @@ export default function NavBar() {
 
   // --- Navigation Links ---
   const getNavigationLinks = () => {
-    // Regex to specifically match /[phoneNumber] (assuming it's numeric) and not other root paths
-    const isPublicPaymentPage = /^\/\+?[0-9]{10,}$/.test(pathname);
-    const callbackUrlParam = `?callbackUrl=${encodeURIComponent(
-      pathname + searchParams.toString()
-    )}`;
+    const callbackUrlParam = `?callbackUrl=${encodeURIComponent(currentPathWithSearch)}`;
 
     if (isPublicPaymentPage) {
-      // Public payment page links
-      if (!isAuthenticated || userType === "motorista") {
+      if (!isAuthenticated) {
         return [
-          { href: `/login${callbackUrlParam}`, text: "Sign In" },
-          { href: `/cadastro${callbackUrlParam}`, text: "Create Account" },
+          { href: `/login${callbackUrlParam}`, text: "Entrar" },
+          { href: `/cadastro${callbackUrlParam}`, text: "Criar Conta" },
         ];
       }
-      // No additional nav links for authenticated clients on public page (will use profile dropdown)
+
+      if (canUseDriverView) {
+        return [
+          { href: "/cliente/dashboard", text: "Área do Cliente" },
+          { href: "/motorista/dashboard/overview", text: "Área do Motorista" },
+        ];
+      }
+
       return [];
     } else if (!isAuthenticated) {
       // Unauthenticated user on non-public page
       return [
         { href: "/login", text: "Acesse sua Conta" },
         { href: "/cadastro", text: "Criar Conta" },
-        { href: "/motorista/login", text: "Sou Vendedor" },
+        { href: "/cadastro?mode=driver", text: "Receber Pagamentos" },
       ];
     }
 
@@ -301,8 +287,8 @@ export default function NavBar() {
     isMobile: boolean
   ) => {
     const baseStyle = isMobile
-      ? "block px-4 py-2 text-base text-gray-700 hover:bg-gray-100 w-full text-left"
-      : "text-sm font-medium text-gray-600 hover:text-gray-900";
+      ? "block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 w-full text-left transition-colors duration-150 cursor-pointer"
+      : "text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 rounded-xl transition-colors duration-150 cursor-pointer";
 
     if (link.href && !link.disabled) {
       return (
@@ -345,15 +331,12 @@ export default function NavBar() {
 
   // --- Render NavBar ---
   // Determine if the simplified public view should be shown (Guests and Drivers on Public Page)
-  const isPublicPaymentPage = /^\/\+?[0-9]{10,}$/.test(pathname);
   const showSimplifiedPublicView =
-    isPublicPaymentPage && (!isAuthenticated || userType === "motorista");
+    isPublicPaymentPage && (!isAuthenticated || canUseDriverView);
 
   return (
     <header
-      className={`sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200 ${
-        showSimplifiedPublicView ? "border-none shadow-none" : ""
-      }`}
+      className={`sticky top-0 z-50 border-b ${showSimplifiedPublicView ? "bg-transparent border-transparent shadow-none" : "bg-white/95 backdrop-blur-md border-gray-100 shadow-sm"}`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Simplified view for Guests/Drivers on Public Page */}
@@ -370,15 +353,8 @@ export default function NavBar() {
           <div className="flex items-center justify-between h-16">
             {/* Logo - Hidden in simplified view */}
             <div className="flex-shrink-0">
-              <Link href={logoHref} className="flex items-center">
-                <h1 style={{
-                  fontSize: '1.5rem',
-                  fontWeight: '800',
-                  margin: 0
-                }}>
-                  <span style={{ color: '#8B7DD8' }}>Amo</span>
-                  <span style={{ color: '#81C995' }}>Pagar</span>
-                </h1>
+              <Link href={logoHref} className="flex items-center" style={{ textDecoration: 'none' }}>
+                <Logo />
               </Link>
             </div>
 
@@ -388,37 +364,66 @@ export default function NavBar() {
                 <div className="h-6 w-24 bg-gray-200 animate-pulse rounded"></div>
               ) : isAuthenticated ? (
                 <>
+                  {canUseDriverView && (
+                    <div className="flex items-center rounded-full bg-gray-100 p-1">
+                      <Link
+                        href="/cliente/dashboard"
+                        className={`px-3 py-1.5 text-sm font-medium rounded-full transition ${!pathname.startsWith("/motorista/")
+                            ? "bg-white text-gray-900 shadow-sm"
+                            : "text-gray-600"
+                          }`}
+                      >
+                        Cliente
+                      </Link>
+                      <Link
+                        href="/motorista/dashboard/overview"
+                        className={`px-3 py-1.5 text-sm font-medium rounded-full transition ${pathname.startsWith("/motorista/")
+                            ? "bg-white text-gray-900 shadow-sm"
+                            : "text-gray-600"
+                          }`}
+                      >
+                        Motorista
+                      </Link>
+                    </div>
+                  )}
                   {/* <span onClick={handleSignOut}>Logout</span> */}
                   <div className="relative" ref={profileDropdownRef}>
                     <button
                       onClick={() =>
                         setIsProfileDropdownOpen(!isProfileDropdownOpen)
                       }
-                      className="flex items-center space-x-2 text-sm font-medium text-gray-700 hover:text-gray-900 focus:outline-none"
+                      className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 focus:outline-none bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-full pl-1 pr-3 py-1 transition-colors duration-150 cursor-pointer"
+                      aria-expanded={isProfileDropdownOpen}
+                      aria-haspopup="true"
                     >
-                      <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                      <div className="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
                         {session?.user?.image ? (
-                          <img
-                            src={session.user.image}
-                            alt="Profile"
-                            className="w-8 h-8 rounded-full"
+                          <div
+                            className="h-7 w-7 rounded-full bg-cover bg-center"
+                            style={{ backgroundImage: `url(${session.user.image})` }}
+                            aria-hidden="true"
                           />
                         ) : (
-                          <User className="w-4 h-4 text-purple-600" />
+                          <User className="w-3.5 h-3.5 text-purple-600" />
                         )}
                       </div>
-                      <span>
-                        {session?.user?.name || session?.user?.email || "User"}
+                      <span className="max-w-[120px] truncate">
+                        {(session?.user?.name || session?.user?.email || "User").split(' ')[0]}
                       </span>
-                      <ChevronDown className="w-4 h-4" />
+                      <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-150 ${isProfileDropdownOpen ? 'rotate-180' : ''}`} />
                     </button>
 
                     {/* Profile Dropdown Menu */}
                     {isProfileDropdownOpen && (
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-200">
-                        {getProfileMenuItems().map((item) =>
-                          renderLink(item, false)
-                        )}
+                      <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl py-1.5 z-10 border border-gray-100 overflow-hidden">
+                        {getProfileMenuItems().map((item, i, arr) => (
+                          <div key={item.text}>
+                            {i === arr.length - 1 && (
+                              <div className="mx-3 my-1 h-px bg-gray-100" />
+                            )}
+                            {renderLink(item, false)}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -465,13 +470,35 @@ export default function NavBar() {
             ) : isAuthenticated ? (
               // User profile section in mobile menu
               <div className="px-4 py-2 border-b border-gray-200 mb-2">
+                {canUseDriverView && (
+                  <div className="mb-3 grid grid-cols-2 gap-2">
+                    <Link
+                      href="/cliente/dashboard"
+                      className={`rounded-lg px-3 py-2 text-center text-sm font-medium ${!pathname.startsWith("/motorista/")
+                          ? "bg-gray-900 text-white"
+                          : "bg-gray-100 text-gray-700"
+                        }`}
+                    >
+                      Cliente
+                    </Link>
+                    <Link
+                      href="/motorista/dashboard/overview"
+                      className={`rounded-lg px-3 py-2 text-center text-sm font-medium ${pathname.startsWith("/motorista/")
+                          ? "bg-gray-900 text-white"
+                          : "bg-gray-100 text-gray-700"
+                        }`}
+                    >
+                      Motorista
+                    </Link>
+                  </div>
+                )}
                 <div className="flex items-center space-x-3 mb-3">
                   <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
                     {session?.user?.image ? (
-                      <img
-                        src={session.user.image}
-                        alt="Profile"
-                        className="w-10 h-10 rounded-full"
+                      <div
+                        className="h-10 w-10 rounded-full bg-cover bg-center"
+                        style={{ backgroundImage: `url(${session.user.image})` }}
+                        aria-hidden="true"
                       />
                     ) : (
                       <User className="w-5 h-5 text-purple-600" />

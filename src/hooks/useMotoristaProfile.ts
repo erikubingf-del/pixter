@@ -7,6 +7,8 @@ interface ProfileData {
   email: string;
   celular: string;
   tipo: string;
+  can_use_driver_view?: boolean;
+  stripe_ready?: boolean;
   profissao?: string;
   stripe_account_id?: string;
   stripe_account_status?: string;
@@ -23,19 +25,27 @@ export function useMotoristaProfile() {
       setLoading(true);
       setError(null);
       
-      const resp = await fetch("/api/motorista/profile");
+      const resp = await fetch("/api/profile");
       
       if (!resp.ok) {
+        if (resp.status === 401) {
+          setProfile(null);
+          return;
+        }
         throw new Error("Erro ao buscar perfil");
       }
       
       const data = await resp.json();
-      console.log("Profile data loaded:", data);
-      
-      setProfile(data);
+
+      if (!data?.profile?.can_use_driver_view) {
+        setProfile(null);
+        return;
+      }
+
+      setProfile(data.profile);
     } catch (err) {
       console.error("Erro:", err);
-      setError("Não foi possível carregar seu perfil. Tente novamente mais tarde.");
+      setProfile(null);
     } finally {
       setLoading(false);
     }
