@@ -14,11 +14,13 @@ export async function GET(request: Request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     const search = searchParams.get('search');
+    const tag = searchParams.get('tag');
 
     let query = supabaseServer
       .from('pagamentos')
       .select(`
         id, created_at, valor, metodo, receipt_number, receipt_pdf_url, receipt_url, status,
+        categoria, client_tags, descricao,
         motorista:profiles!motorista_id ( nome )
       `)
       .eq('cliente_id', userId)
@@ -50,6 +52,12 @@ export async function GET(request: Request) {
       filteredPayments = filteredPayments.filter((p: any) => {
         const motoristaNome = Array.isArray(p.motorista) ? p.motorista[0]?.nome : p.motorista?.nome;
         return motoristaNome?.toLowerCase().includes(searchLower);
+      });
+    }
+    if (tag && tag.trim()) {
+      filteredPayments = filteredPayments.filter((p: any) => {
+        const tags: string[] = Array.isArray(p.client_tags) ? p.client_tags : [];
+        return tags.includes(tag.trim());
       });
     }
 
