@@ -19,10 +19,6 @@ export async function GET(request: Request) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (callbackUrl) {
-    return NextResponse.redirect(new URL(callbackUrl, url.origin));
-  }
-
   const useDriverView =
     session.tipo === 'motorista' ? true : await hasDriverCapability(session.id);
 
@@ -36,9 +32,15 @@ export async function GET(request: Request) {
     if (!isDriverOnboardingComplete(profile)) {
       return NextResponse.redirect(new URL('/motorista/cadastro', url.origin));
     }
+
+    // Drivers always go to the driver dashboard — ignore callbackUrl
+    return NextResponse.redirect(new URL('/motorista/dashboard/overview', url.origin));
   }
 
-  return NextResponse.redirect(
-    new URL(useDriverView ? '/motorista/dashboard/overview' : '/cliente/dashboard', url.origin)
-  );
+  // For clients, respect callbackUrl if present
+  if (callbackUrl) {
+    return NextResponse.redirect(new URL(callbackUrl, url.origin));
+  }
+
+  return NextResponse.redirect(new URL('/cliente/dashboard', url.origin));
 }
