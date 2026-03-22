@@ -2,6 +2,7 @@ import { NextResponse, NextRequest } from "next/server";
 import QRCode from "qrcode";
 import { supabaseServer } from "@/lib/supabase/client";
 import { safeErrorResponse } from "@/lib/utils/api-error";
+import { getPublicPaymentUrl } from "@/lib/utils/payment";
 
 export const dynamic = 'force-dynamic';
 
@@ -25,10 +26,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Perfil do motorista não encontrado." }, { status: 404 });
     }
 
-    const digitsOnly = profile.celular.replace(/\D/g, "");
-    const formattedPhoneForUrl = digitsOnly.startsWith("55") ? digitsOnly.substring(2) : digitsOnly;
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    const paymentUrl = `${appUrl}/${formattedPhoneForUrl}`;
+    const paymentUrl = getPublicPaymentUrl(appUrl, profile.celular);
 
     const qrCodeDataUrl = await QRCode.toDataURL(paymentUrl, {
       errorCorrectionLevel: "H",
